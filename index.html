@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台股即時看板 · TW MARKET</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   VARIABLES & RESET
+   ============================================================ */
+:root {
+  --bg:        #070b11;
+  --surface:   #0c1220;
+  --surface2:  #101828;
+  --surface3:  #162035;
+  --border:    #192840;
+  --border2:   #233658;
+  --green:     #00e87a;
+  --green-dim: rgba(0,232,122,0.12);
+  --red:       #ff2d5e;
+  --red-dim:   rgba(255,45,94,0.12);
+  --blue:      #00aaff;
+  --blue-dim:  rgba(0,170,255,0.08);
+  --amber:     #ffaa00;
+  --text:      #b8cce0;
+  --text-dim:  #4a6070;
+  --text-mute: #283848;
+  --text-hi:   #ddeeff;
+  --mono:      'Share Tech Mono', monospace;
+  --sans:      'Noto Sans TC', sans-serif;
+  --logo:      'Orbitron', sans-serif;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+/* grid scanline overlay */
+body::before {
+  content:'';
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:0;
+  background-image:
+    linear-gradient(rgba(0,170,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,170,255,.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+/* subtle vignette */
+body::after {
+  content:'';
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:0;
+  background: radial-gradient(ellipse at 50% 0%, transparent 60%, rgba(0,0,0,.6) 100%);
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-dim)}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+header {
+  position:sticky;top:0;z-index:200;
+  background: rgba(7,11,17,.96);
+  backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--border);
+}
+.header-bar {
+  display:flex;align-items:center;gap:12px;
+  padding:0 24px;height:58px;
+}
+
+/* Logo */
+.logo {
+  font-family:var(--logo);
+  font-weight:900;
+  font-size:16px;
+  letter-spacing:3px;
+  color:var(--blue);
+  text-shadow:0 0 24px rgba(0,170,255,.6);
+  white-space:nowrap;
+  user-select:none;
+}
+.logo em { color:var(--green); font-style:normal; }
+
+.divider { width:1px; height:24px; background:var(--border); flex-shrink:0; }
+
+/* Market status */
+.mkt-status {
+  display:flex;align-items:center;gap:7px;
+  font-family:var(--mono);font-size:11px;
+  white-space:nowrap;
+}
+.pulse-dot {
+  width:7px;height:7px;border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 0 0 rgba(0,232,122,.4);
+  animation:pulse 2s infinite;
+}
+.pulse-dot.off{background:var(--text-dim);animation:none;box-shadow:none}
+@keyframes pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(0,232,122,.5)}
+  50%{box-shadow:0 0 0 5px rgba(0,232,122,0)}
+}
+#statusText{color:var(--text-dim)}
+#statusText.open{color:var(--green)}
+
+/* Clock */
+.clock{font-family:var(--mono);font-size:13px;color:var(--text-dim);white-space:nowrap}
+
+/* spacer */
+.spacer{flex:1}
+
+/* Search */
+.search-wrap{display:flex;align-items:center;gap:8px}
+.search-wrap input{
+  background:var(--surface2);
+  border:1px solid var(--border2);
+  color:var(--text-hi);
+  font-family:var(--mono);font-size:13px;
+  border-radius:6px;padding:7px 12px;
+  width:140px;outline:none;
+  transition:border-color .2s,box-shadow .2s;
+}
+.search-wrap input::placeholder{color:var(--text-dim)}
+.search-wrap input:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(0,170,255,.15)}
+.add-btn{
+  background:var(--blue);color:#000;
+  border:none;border-radius:6px;
+  padding:7px 14px;font-size:11px;font-weight:700;
+  cursor:pointer;transition:all .2s;white-space:nowrap;
+  font-family:var(--sans);
+}
+.add-btn:hover{background:#22bbff;transform:translateY(-1px)}
+.add-btn:active{transform:translateY(0)}
+
+/* Refresh */
+.refresh-wrap{
+  display:flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:11px;color:var(--text-dim);
+  white-space:nowrap;
+}
+.refresh-btn{
+  background:none;border:1px solid var(--border2);
+  color:var(--text-dim);border-radius:5px;
+  padding:5px 9px;font-size:11px;cursor:pointer;
+  transition:all .2s;font-family:var(--mono);
+}
+.refresh-btn:hover{border-color:var(--blue);color:var(--blue)}
+#countdown{
+  display:inline-block;min-width:18px;text-align:right;
+  color:var(--text);
+}
+
+/* ============================================================
+   TICKER TAPE
+   ============================================================ */
+.ticker-tape {
+  overflow:hidden;
+  border-top:1px solid var(--border);
+  background: linear-gradient(90deg, var(--surface) 0%, transparent 5%, transparent 95%, var(--surface) 100%);
+  height:30px;display:flex;align-items:center;
+  position:relative;
+}
+/* fade edges */
+.ticker-tape::before,.ticker-tape::after{
+  content:'';position:absolute;top:0;bottom:0;width:60px;z-index:1;
+}
+.ticker-tape::before{left:0;background:linear-gradient(90deg,var(--surface),transparent)}
+.ticker-tape::after{right:0;background:linear-gradient(270deg,var(--surface),transparent)}
+
+.ticker-scroll{
+  display:flex;gap:0;
+  animation:ticker 80s linear infinite;
+  white-space:nowrap;
+  will-change:transform;
+}
+.ticker-scroll:hover{animation-play-state:paused}
+@keyframes ticker{
+  0%{transform:translateX(0)}
+  100%{transform:translateX(-50%)}
+}
+.tick-item{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:0 28px;
+  font-family:var(--mono);font-size:11px;
+  border-right:1px solid var(--border);
+}
+.tick-code{color:var(--text-dim)}
+.tick-price{font-weight:bold}
+.tick-pct{font-size:10px}
+.up{color:var(--green)}
+.dn{color:var(--red)}
+.flat{color:var(--text-dim)}
+
+/* ============================================================
+   MAIN
+   ============================================================ */
+main{
+  position:relative;z-index:1;
+  max-width:1680px;margin:0 auto;
+  padding:22px 24px 48px;
+}
+
+/* Stats bar */
+.stats-row{
+  display:flex;align-items:center;flex-wrap:wrap;gap:20px;
+  margin-bottom:18px;
+  font-family:var(--mono);font-size:12px;
+}
+.stat-chip{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 12px;border-radius:20px;
+  background:var(--surface2);border:1px solid var(--border);
+}
+.sc-label{color:var(--text-dim)}
+.sc-val{font-weight:bold;color:var(--text-hi)}
+.sc-val.up{color:var(--green)}
+.sc-val.dn{color:var(--red)}
+.sc-val.amber{color:var(--amber)}
+
+/* Category tabs */
+.tabs{
+  display:flex;flex-wrap:wrap;gap:6px;
+  margin-bottom:20px;
+}
+.tab{
+  background:none;
+  border:1px solid var(--border);
+  color:var(--text-dim);
+  border-radius:5px;
+  padding:5px 14px;font-size:12px;
+  font-family:var(--sans);cursor:pointer;
+  transition:all .2s;
+}
+.tab:hover{border-color:var(--border2);color:var(--text)}
+.tab.active{
+  background:var(--blue);border-color:var(--blue);
+  color:#000;font-weight:700;
+}
+
+/* Section label */
+.section-title{
+  font-family:var(--mono);font-size:11px;
+  color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;
+  margin-bottom:14px;padding-left:2px;
+}
+
+/* Error banner */
+.error-banner{
+  background:rgba(255,45,94,.08);border:1px solid rgba(255,45,94,.2);
+  color:var(--red);border-radius:8px;padding:12px 16px;
+  font-family:var(--mono);font-size:12px;
+  margin-bottom:16px;display:none;
+}
+
+/* ============================================================
+   STOCK GRID
+   ============================================================ */
+.stock-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(272px,1fr));
+  gap:14px;
+}
+
+/* ============================================================
+   STOCK CARD
+   ============================================================ */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:15px 16px;
+  position:relative;overflow:hidden;
+  cursor:default;
+  transition:border-color .25s, transform .2s, box-shadow .2s;
+}
+/* top accent bar */
+.card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--border2);
+  transition:background .3s;
+}
+.card.card-up::before{background:var(--green)}
+.card.card-dn::before{background:var(--red)}
+.card.card-flat::before{background:var(--border2)}
+
+.card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 10px 40px rgba(0,0,0,.5);
+}
+.card.card-up:hover{border-color:rgba(0,232,122,.25)}
+.card.card-dn:hover{border-color:rgba(255,45,94,.25)}
+
+/* flash on update */
+.card.flash{animation:flash-anim .6s ease}
+@keyframes flash-anim{
+  0%{background:var(--surface)}
+  30%{background:rgba(0,170,255,.06)}
+  100%{background:var(--surface)}
+}
+
+/* Remove btn */
+.rm-btn{
+  position:absolute;top:8px;right:8px;
+  background:none;border:none;color:var(--text-dim);
+  font-size:13px;cursor:pointer;
+  opacity:0;transition:opacity .15s,color .15s;
+  padding:2px 6px;border-radius:4px;
+  line-height:1;
+}
+.card:hover .rm-btn{opacity:.4}
+.rm-btn:hover{opacity:1!important;color:var(--red)!important}
+
+/* Card header */
+.card-head{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  margin-bottom:11px;padding-right:22px;
+}
+.c-code{font-family:var(--mono);font-size:12px;color:var(--text-dim);letter-spacing:.5px}
+.c-name{font-size:15px;font-weight:700;color:var(--text-hi);margin-top:2px;line-height:1.3}
+.c-tag{
+  font-size:9px;padding:2px 8px;
+  border-radius:20px;
+  background:var(--surface3);
+  border:1px solid var(--border);
+  color:var(--text-dim);
+  white-space:nowrap;flex-shrink:0;
+  margin-top:2px;
+}
+
+/* Price */
+.c-price{
+  font-family:var(--mono);
+  font-size:30px;font-weight:bold;line-height:1;
+  margin-bottom:5px;
+  transition:color .3s;
+}
+.c-price.up{color:var(--green)}
+.c-price.dn{color:var(--red)}
+.c-price.flat{color:var(--text-hi)}
+.c-price.none{color:var(--text-dim);font-size:22px}
+
+.c-change{
+  display:flex;align-items:center;gap:7px;
+  font-family:var(--mono);font-size:12px;
+  margin-bottom:14px;
+}
+.arrow{font-size:15px}
+
+/* OHLC */
+.ohlc{
+  display:grid;grid-template-columns:1fr 1fr 1fr 1fr;
+  gap:2px;margin-bottom:10px;
+}
+.ohlc-cell{text-align:center;padding:4px 2px;background:var(--surface2);border-radius:4px}
+.ohlc-lbl{display:block;font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:2px}
+.ohlc-val{font-family:var(--mono);font-size:11px;color:var(--text)}
+.ohlc-val.up{color:var(--green)}
+.ohlc-val.dn{color:var(--red)}
+
+/* Range bar */
+.range-wrap{margin-bottom:12px}
+.range-lims{
+  display:flex;justify-content:space-between;
+  font-family:var(--mono);font-size:9px;color:var(--text-dim);
+  margin-bottom:4px;
+}
+.range-track{
+  height:4px;background:var(--surface3);border-radius:2px;position:relative;overflow:visible;
+}
+.range-fill{
+  position:absolute;top:0;left:0;right:0;height:100%;
+  background:linear-gradient(90deg,var(--red),var(--green));
+  border-radius:2px;
+}
+.range-dot{
+  position:absolute;top:-4px;
+  width:12px;height:12px;border-radius:50%;
+  background:#fff;
+  box-shadow:0 0 6px rgba(255,255,255,.4);
+  transform:translateX(-50%);
+  transition:left .4s ease;
+}
+
+/* Footer */
+.c-foot{
+  display:flex;align-items:center;justify-content:space-between;
+  padding-top:9px;border-top:1px solid var(--border);
+}
+.c-vol{font-family:var(--mono);font-size:10px;color:var(--text-dim)}
+.c-time{font-family:var(--mono);font-size:10px;color:var(--text-mute)}
+
+/* Skeleton */
+.skel{
+  height:14px;border-radius:4px;
+  background:linear-gradient(90deg,var(--surface2),var(--surface3),var(--surface2));
+  background-size:300% 100%;
+  animation:skel-anim 1.6s ease infinite;
+}
+@keyframes skel-anim{
+  0%{background-position:100% 50%}
+  100%{background-position:-100% 50%}
+}
+
+/* Empty state */
+.empty{
+  grid-column:1/-1;
+  text-align:center;padding:60px 20px;
+  font-family:var(--mono);font-size:13px;color:var(--text-dim);
+}
+.empty strong{display:block;font-size:28px;margin-bottom:8px;color:var(--text-mute)}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+.page-foot{
+  text-align:center;
+  padding:20px 24px;
+  font-family:var(--mono);font-size:10px;color:var(--text-dim);
+  border-top:1px solid var(--border);
+  position:relative;z-index:1;
+}
+.page-foot span{color:var(--text-mute)}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media(max-width:780px){
+  .header-bar{padding:0 14px;height:auto;flex-wrap:wrap;padding-top:10px;padding-bottom:10px;gap:8px}
+  .refresh-wrap{display:none}
+  main{padding:14px}
+  .stock-grid{grid-template-columns:1fr 1fr}
+  .c-price{font-size:24px}
+}
+@media(max-width:480px){
+  .stock-grid{grid-template-columns:1fr}
+}
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+.toast{
+  position:fixed;bottom:24px;right:24px;z-index:9999;
+  background:var(--surface3);border:1px solid var(--border2);
+  color:var(--text);font-family:var(--mono);font-size:12px;
+  padding:10px 16px;border-radius:8px;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+  opacity:0;transform:translateY(10px);
+  transition:all .3s;pointer-events:none;
+}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.ok{border-color:rgba(0,232,122,.3);color:var(--green)}
+.toast.err{border-color:rgba(255,45,94,.3);color:var(--red)}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ HEADER ═══════════════════ -->
+<header>
+  <div class="header-bar">
+    <div class="logo">TW<em>MARKET</em></div>
+    <div class="divider"></div>
+
+    <div class="mkt-status">
+      <div class="pulse-dot" id="pulseDot"></div>
+      <span id="statusText">檢查中</span>
+    </div>
+
+    <div class="clock" id="clock">--:--:--</div>
+
+    <div class="spacer"></div>
+
+    <div class="search-wrap">
+      <input type="text" id="searchInput" placeholder="股票代號…" maxlength="7"
+             onkeydown="if(event.key==='Enter')addStock()">
+      <button class="add-btn" onclick="addStock()">＋ 加入</button>
+    </div>
+
+    <div class="refresh-wrap">
+      <span id="countdown">15</span>s
+      <button class="refresh-btn" onclick="manualRefresh()">⟳ 更新</button>
+    </div>
+  </div>
+
+  <!-- Ticker tape -->
+  <div class="ticker-tape">
+    <div class="ticker-scroll" id="ticker">
+      <span class="tick-item flat">載入行情中...</span>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════ MAIN ═══════════════════ -->
+<main>
+  <div class="error-banner" id="errorBanner">
+    ⚠ 無法連線至行情伺服器，顯示快取資料。可能原因：市場已收盤、CORS 限制或網路問題。
+  </div>
+
+  <div class="stats-row" id="statsRow">
+    <div class="stat-chip"><span class="sc-label">載入中</span></div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="section-title" id="sectionTitle">即時行情</div>
+
+  <div class="stock-grid" id="grid"></div>
+</main>
+
+<!-- ═══════════════════ FOOTER ═══════════════════ -->
+<div class="page-foot">
+  資料來源：台灣證券交易所 (TWSE MIS) &nbsp;·&nbsp; 資料僅供參考，不構成投資建議
+  &nbsp;·&nbsp; 最後更新：<span id="lastUpdate">--</span>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ═══════════════════ SCRIPT ═══════════════════ -->
+<script>
+'use strict';
+
+/* ─── WATCHLIST (default) ─── */
+const DEFAULT_LIST = [
+  // ETF
+  {code:'0050', name:'元大台灣50',     ex:'tse', cat:'ETF'},
+  {code:'0056', name:'元大高股息',     ex:'tse', cat:'ETF'},
+  {code:'00878',name:'國泰永續高股息', ex:'tse', cat:'ETF'},
+  {code:'00929',name:'復華台灣科技優息',ex:'tse',cat:'ETF'},
+  {code:'00919',name:'群益台灣精選高息',ex:'tse',cat:'ETF'},
+  {code:'006208',name:'富邦台灣50',    ex:'tse', cat:'ETF'},
+  {code:'00940',name:'元大台灣價值高息',ex:'tse',cat:'ETF'},
+  // 半導體
+  {code:'2330', name:'台積電',   ex:'tse', cat:'半導體'},
+  {code:'2454', name:'聯發科',   ex:'tse', cat:'半導體'},
+  {code:'2303', name:'聯電',     ex:'tse', cat:'半導體'},
+  {code:'3711', name:'日月光投控',ex:'tse',cat:'半導體'},
+  {code:'2379', name:'瑞昱',     ex:'tse', cat:'半導體'},
+  {code:'5347', name:'世界先進', ex:'tse', cat:'半導體'},
+  // AI / 伺服器
+  {code:'2382', name:'廣達',   ex:'tse', cat:'AI伺服器'},
+  {code:'2317', name:'鴻海',   ex:'tse', cat:'AI伺服器'},
+  {code:'2308', name:'台達電', ex:'tse', cat:'AI伺服器'},
+  {code:'3034', name:'聯詠',   ex:'tse', cat:'AI伺服器'},
+  {code:'2301', name:'光寶科', ex:'tse', cat:'AI伺服器'},
+  {code:'3231', name:'緯創',   ex:'tse', cat:'AI伺服器'},
+  {code:'4938', name:'和碩',   ex:'tse', cat:'AI伺服器'},
+  // 金融
+  {code:'2881', name:'富邦金', ex:'tse', cat:'金融'},
+  {code:'2882', name:'國泰金', ex:'tse', cat:'金融'},
+  {code:'2884', name:'玉山金', ex:'tse', cat:'金融'},
+  {code:'2886', name:'兆豐金', ex:'tse', cat:'金融'},
+  {code:'2891', name:'中信金', ex:'tse', cat:'金融'},
+  {code:'2892', name:'第一金', ex:'tse', cat:'金融'},
+  // 電信 / 傳產
+  {code:'2412', name:'中華電', ex:'tse', cat:'電信'},
+  {code:'3045', name:'台灣大', ex:'tse', cat:'電信'},
+  {code:'4904', name:'遠傳',   ex:'tse', cat:'電信'},
+  // 航運
+  {code:'2603', name:'長榮', ex:'tse', cat:'航運'},
+  {code:'2609', name:'陽明', ex:'tse', cat:'航運'},
+  {code:'2615', name:'萬海', ex:'tse', cat:'航運'},
+];
+
+/* ─── STOCK LOOKUP DB (for search) ─── */
+const STOCK_DB = {
+  '0050':'元大台灣50','0051':'元大中型100','0052':'富邦科技',
+  '0053':'元大電子','0054':'元大台商50','0055':'元大MSCI金融',
+  '0056':'元大高股息','006204':'永豐臺灣加權',
+  '006208':'富邦台灣50','00631L':'元大台灣50正2',
+  '00878':'國泰永續高股息','00881':'國泰台灣5G+',
+  '00882':'中信中國高股息','00891':'中信關鍵半導體',
+  '00892':'富邦台灣半導體','00900':'富邦特選高股息30',
+  '00905':'凱基優選高股息30','00907':'永豐優息存股',
+  '00919':'群益台灣精選高息','00929':'復華台灣科技優息',
+  '00934':'中信成長高股息','00936':'台新臺灣IC設計',
+  '00939':'統一台灣高息動能','00940':'元大台灣價值高息',
+  '00941':'台新北美科技','00945':'玉山科技優息',
+  '2301':'光寶科','2303':'聯電','2308':'台達電','2317':'鴻海',
+  '2327':'國巨','2330':'台積電','2345':'智邦','2354':'鴻準',
+  '2357':'華碩','2379':'瑞昱','2382':'廣達','2395':'研華',
+  '2454':'聯發科','2412':'中華電',
+  '2603':'長榮','2609':'陽明','2615':'萬海',
+  '2801':'彰銀','2880':'華南金','2881':'富邦金','2882':'國泰金',
+  '2883':'開發金','2884':'玉山金','2885':'元大金','2886':'兆豐金',
+  '2887':'台新金','2888':'新光金','2890':'永豐金','2891':'中信金',
+  '2892':'第一金','1101':'台灣水泥','1102':'亞洲水泥',
+  '1216':'統一','1301':'台塑','1303':'南亞','1326':'台化',
+  '2002':'中鋼','6505':'台塑化','3008':'大立光',
+  '3034':'聯詠','3045':'台灣大','3231':'緯創','3711':'日月光投控',
+  '4904':'遠傳','4938':'和碩','5347':'世界先進',
+  '6669':'緯穎',
+};
+/* For OTC stocks */
+const OTC_CODES = new Set(['6669']);
+
+/* ─── STATE ─── */
+let watchlist   = [];
+let cache       = {};     // code → TWSE msgArray item
+let activeCat   = '全部';
+let countdown   = 15;
+let refreshTimer= null;
+let isRefreshing= false;
+
+/* ─── HELPERS ─── */
+function twNow(){
+  return new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Taipei'}));
+}
+function isMktOpen(){
+  const t=twNow(), d=t.getDay(), m=t.getHours()*60+t.getMinutes();
+  return d>=1&&d<=5 && m>=540&&m<810;
+}
+function fmtTime(){
+  return twNow().toLocaleTimeString('zh-TW',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function fp(v,dec=2){
+  if(!v||v==='-')return null;
+  const n=parseFloat(v);
+  return isNaN(n)?null:+n.toFixed(dec);
+}
+function fmtVol(v){
+  if(!v||v==='-')return '--';
+  const n=parseInt(v);
+  if(isNaN(n))return '--';
+  if(n>=100000)return (n/10000).toFixed(1)+'萬張';
+  return n.toLocaleString()+'張';
+}
+function clsOf(chg){
+  if(chg===null||chg===undefined)return 'flat';
+  return chg>0?'up':chg<0?'dn':'flat';
+}
+function arrowOf(chg){
+  if(chg===null)return '–';
+  return chg>0?'▲':chg<0?'▼':'–';
+}
+function sign(n){return n>=0?'+':'-'}
+function abs2(n){return Math.abs(n).toFixed(2)}
+function pct(chg,base){
+  if(chg===null||!base)return null;
+  return chg/base*100;
+}
+
+/* ─── TOAST ─── */
+function toast(msg,type=''){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.className='toast show '+(type||'');
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>el.className='toast',3000);
+}
+
+/* ─── CORS PROXIES ─── */
+const PROXIES=[
+  u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://thingproxy.freeboard.io/fetch/${u}`,
+];
+
+async function fetchTWSE(stocks){
+  const exCh=stocks.map(s=>`${s.ex}_${s.code}.tw`).join('|');
+  const base=`https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${exCh}&json=1&delay=0`;
+
+  // 1. Direct
+  try{
+    const r=await fetch(base,{signal:AbortSignal.timeout(5000)});
+    if(r.ok){const d=await r.json();if(d.msgArray?.length)return d.msgArray;}
+  }catch(_){}
+
+  // 2. Proxies
+  for(const proxy of PROXIES){
+    try{
+      const r=await fetch(proxy(base),{signal:AbortSignal.timeout(9000)});
+      if(r.ok){
+        const txt=await r.text();
+        const d=JSON.parse(txt);
+        if(d.msgArray?.length)return d.msgArray;
+      }
+    }catch(_){}
+  }
+  return null;
+}
+
+async function doRefresh(){
+  if(isRefreshing||watchlist.length===0)return;
+  isRefreshing=true;
+
+  const BATCH=20;
+  const results=[];
+  let anyOk=false;
+
+  for(let i=0;i<watchlist.length;i+=BATCH){
+    const batch=watchlist.slice(i,i+BATCH);
+    const data=await fetchTWSE(batch);
+    if(data){anyOk=true;results.push(...data);}
+  }
+
+  document.getElementById('errorBanner').style.display=anyOk?'none':'block';
+
+  if(results.length){
+    results.forEach(item=>{
+      const prev=cache[item.c];
+      const flash=prev&&prev.z!==item.z;
+      cache[item.c]=item;
+      if(flash)cache[item.c]._flash=true;
+    });
+    renderGrid();
+    renderTicker();
+    renderStats();
+    document.getElementById('lastUpdate').textContent=fmtTime();
+  }
+  isRefreshing=false;
+}
+
+function manualRefresh(){
+  countdown=15;
+  doRefresh();
+}
+
+/* ─── WATCHLIST PERSIST ─── */
+function saveList(){
+  try{localStorage.setItem('twmkt_v2',JSON.stringify(watchlist));}catch(_){}
+}
+function loadList(){
+  try{
+    const s=localStorage.getItem('twmkt_v2');
+    if(s){watchlist=JSON.parse(s);return;}
+  }catch(_){}
+  watchlist=[...DEFAULT_LIST];
+}
+
+/* ─── ADD STOCK ─── */
+async function addStock(){
+  const inp=document.getElementById('searchInput');
+  const raw=inp.value.trim();
+  if(!raw){toast('請輸入股票代號','err');return;}
+  const code=raw.replace(/[^0-9A-Za-z]/g,'').toUpperCase();
+  if(!code){toast('代號格式有誤','err');return;}
+
+  if(watchlist.find(s=>s.code===code)){
+    toast(`${code} 已在清單中`,'err');
+    inp.value='';return;
+  }
+
+  const name=STOCK_DB[code]||code;
+  const ex=OTC_CODES.has(code)?'otc':'tse';
+  const newStock={code,name,ex,cat:'自選'};
+  watchlist.push(newStock);
+  saveList();
+  inp.value='';
+
+  // Render placeholder
+  renderGrid();
+
+  // Fetch immediately
+  const data=await fetchTWSE([newStock]);
+  if(data&&data.length){
+    cache[code]=data[0];
+    if(data[0].n)newStock.name=data[0].n;
+    saveList();
+  }
+  renderGrid();
+  renderTicker();
+  renderStats();
+  toast(`已加入 ${newStock.name}`,'ok');
+}
+
+function removeStock(code,ev){
+  ev.stopPropagation();
+  watchlist=watchlist.filter(s=>s.code!==code);
+  delete cache[code];
+  saveList();
+  renderGrid();
+  renderTicker();
+  renderStats();
+}
+
+/* ─── CATEGORIES ─── */
+function getCategories(){
+  const cats=['全部',...new Set(watchlist.map(s=>s.cat))];
+  return cats;
+}
+function renderTabs(){
+  const cats=getCategories();
+  document.getElementById('tabs').innerHTML=
+    cats.map(c=>`<button class="tab${c===activeCat?' active':''}" onclick="setTab('${c}')">${c}</button>`).join('');
+}
+function setTab(cat){
+  activeCat=cat;
+  renderTabs();
+  renderGrid();
+}
+
+/* ─── STATS ─── */
+function renderStats(){
+  const total=watchlist.length;
+  let up=0,dn=0;
+  watchlist.forEach(s=>{
+    const d=cache[s.code];
+    if(!d)return;
+    const p=fp(d.z),y=fp(d.y);
+    if(p===null||y===null)return;
+    if(p>y)up++;else if(p<y)dn++;
+  });
+  const fl=total-up-dn;
+  document.getElementById('statsRow').innerHTML=`
+    <div class="stat-chip"><span class="sc-label">追蹤</span><span class="sc-val">${total} 檔</span></div>
+    <div class="stat-chip"><span class="sc-label">上漲</span><span class="sc-val up">▲ ${up}</span></div>
+    <div class="stat-chip"><span class="sc-label">下跌</span><span class="sc-val dn">▼ ${dn}</span></div>
+    <div class="stat-chip"><span class="sc-label">持平</span><span class="sc-val amber">– ${fl}</span></div>
+  `;
+}
+
+/* ─── TICKER ─── */
+function renderTicker(){
+  const items=watchlist.map(s=>{
+    const d=cache[s.code];
+    if(!d)return `<span class="tick-item flat"><span class="tick-code">${s.code}</span><span>${s.name}</span><span class="tick-price">--</span></span>`;
+    const p=fp(d.z),y=fp(d.y);
+    const chg=p!==null&&y!==null?p-y:null;
+    const pctv=pct(chg,y);
+    const cls=clsOf(chg);
+    return `<span class="tick-item ${cls}">
+      <span class="tick-code">${s.code}</span>
+      <span>${d.n||s.name}</span>
+      <span class="tick-price">${p!==null?p.toFixed(2):'--'}</span>
+      <span class="tick-pct">${pctv!==null?(pctv>=0?'+':'')+pctv.toFixed(2)+'%':'--'}</span>
+    </span>`;
+  }).join('');
+  // Duplicate for seamless loop
+  document.getElementById('ticker').innerHTML=items+items;
+}
+
+/* ─── GRID ─── */
+function renderGrid(){
+  renderTabs();
+  const filtered=activeCat==='全部'
+    ?watchlist
+    :watchlist.filter(s=>s.cat===activeCat);
+
+  const cnt=filtered.length;
+  document.getElementById('sectionTitle').textContent=
+    `${activeCat==='全部'?'所有追蹤':activeCat} · ${cnt} 檔`;
+
+  if(!cnt){
+    document.getElementById('grid').innerHTML=
+      `<div class="empty"><strong>∅</strong>此分類暫無股票</div>`;
+    return;
+  }
+
+  document.getElementById('grid').innerHTML=filtered.map(s=>cardHTML(s)).join('');
+
+  // Apply flash animation
+  filtered.forEach(s=>{
+    if(cache[s.code]?._flash){
+      const el=document.getElementById('c-'+s.code);
+      if(el){el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),700);}
+      delete cache[s.code]._flash;
+    }
+  });
+}
+
+function cardHTML(stock){
+  const d=cache[stock.code];
+
+  if(!d){
+    return `<div class="card" id="c-${stock.code}">
+      <button class="rm-btn" onclick="removeStock('${stock.code}',event)">✕</button>
+      <div class="card-head">
+        <div><div class="c-code">${stock.code}</div><div class="c-name">${stock.name}</div></div>
+        <div class="c-tag">${stock.cat}</div>
+      </div>
+      <div class="skel" style="height:36px;margin-bottom:8px"></div>
+      <div class="skel" style="height:14px;width:60%;margin-bottom:14px"></div>
+      <div class="skel" style="height:28px;margin-bottom:10px"></div>
+      <div class="skel" style="height:8px;margin-bottom:12px"></div>
+      <div class="skel" style="height:12px"></div>
+    </div>`;
+  }
+
+  const p   = fp(d.z);
+  const y   = fp(d.y);
+  const o   = fp(d.o);
+  const hi  = fp(d.h);
+  const lo  = fp(d.l);
+  const chg = (p!==null&&y!==null)?p-y:null;
+  const pctv= pct(chg,y);
+  const cls = clsOf(chg);
+
+  const priceStr = p!==null ? p.toFixed(2) : '--';
+  const priceClass = p===null?'none':cls;
+
+  const chgStr  = chg!==null ? `${sign(chg)}${abs2(chg)}` : '--';
+  const pctStr  = pctv!==null? `${sign(pctv)}${Math.abs(pctv).toFixed(2)}%`:'--';
+
+  // Range bar
+  let rangeHTML='';
+  if(p!==null&&hi!==null&&lo!==null&&hi>lo){
+    const pos=((p-lo)/(hi-lo)*100).toFixed(1);
+    rangeHTML=`<div class="range-wrap">
+      <div class="range-lims"><span>${lo.toFixed(2)}</span><span>${hi.toFixed(2)}</span></div>
+      <div class="range-track">
+        <div class="range-fill"></div>
+        <div class="range-dot" style="left:${pos}%"></div>
+      </div>
+    </div>`;
+  }
+
+  const updateT = d.t ? d.t.slice(0,5) : '--';
+  const name    = d.n || stock.name;
+
+  return `<div class="card card-${cls}" id="c-${stock.code}">
+    <button class="rm-btn" onclick="removeStock('${stock.code}',event)">✕</button>
+
+    <div class="card-head">
+      <div>
+        <div class="c-code">${stock.code}</div>
+        <div class="c-name">${name}</div>
+      </div>
+      <div class="c-tag">${stock.cat}</div>
+    </div>
+
+    <div class="c-price ${priceClass}">${priceStr}</div>
+    <div class="c-change ${cls}" style="margin-bottom:12px">
+      <span class="arrow">${arrowOf(chg)}</span>
+      <span>${chgStr}</span>
+      <span style="opacity:.7">(${pctStr})</span>
+    </div>
+
+    <div class="ohlc">
+      <div class="ohlc-cell">
+        <span class="ohlc-lbl">昨收</span>
+        <span class="ohlc-val">${y!==null?y.toFixed(2):'--'}</span>
+      </div>
+      <div class="ohlc-cell">
+        <span class="ohlc-lbl">開盤</span>
+        <span class="ohlc-val">${o!==null?o.toFixed(2):'--'}</span>
+      </div>
+      <div class="ohlc-cell">
+        <span class="ohlc-lbl">最高</span>
+        <span class="ohlc-val up">${hi!==null?hi.toFixed(2):'--'}</span>
+      </div>
+      <div class="ohlc-cell">
+        <span class="ohlc-lbl">最低</span>
+        <span class="ohlc-val dn">${lo!==null?lo.toFixed(2):'--'}</span>
+      </div>
+    </div>
+
+    ${rangeHTML}
+
+    <div class="c-foot">
+      <span class="c-vol">📊 ${fmtVol(d.v)}</span>
+      <span class="c-time">${updateT}</span>
+    </div>
+  </div>`;
+}
+
+/* ─── CLOCK & COUNTDOWN ─── */
+function tick(){
+  const now=fmtTime();
+  document.getElementById('clock').textContent=now;
+
+  // Market status
+  const open=isMktOpen();
+  const dot=document.getElementById('pulseDot');
+  const txt=document.getElementById('statusText');
+  dot.className='pulse-dot'+(open?'':' off');
+  txt.textContent=open?'市場交易中':'市場已收盤';
+  txt.className=open?'open':'';
+
+  // Countdown
+  countdown--;
+  if(countdown<=0){
+    countdown=isMktOpen()?15:60;
+    doRefresh();
+  }
+  document.getElementById('countdown').textContent=countdown;
+}
+
+/* ─── INIT ─── */
+function init(){
+  loadList();
+  renderGrid();
+  renderStats();
+
+  // Render skeleton ticker
+  document.getElementById('ticker').innerHTML=
+    watchlist.map(s=>`<span class="tick-item flat"><span class="tick-code">${s.code}</span><span>${s.name}</span><span class="tick-price">--</span></span>`).join('').repeat(2);
+
+  setInterval(tick,1000);
+  doRefresh();
+}
+
+window.addEventListener('DOMContentLoaded',init);
+
+/* ─── VISIBILITY: refresh when tab regains focus ─── */
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden)doRefresh();
+});
+</script>
+</body>
+</html>
