@@ -591,12 +591,33 @@ main{
    FOOTER
    ============================================================ */
 .page-foot{
-  text-align:center;padding:20px 24px;
+  text-align:center;padding:18px 24px 24px;
   font-family:var(--mono);font-size:10px;color:var(--text-dim);
   border-top:1px solid var(--border);
   position:relative;z-index:1;
+  line-height:1.7;
 }
 .page-foot span{color:var(--text-mute)}
+.disclaimer{
+  max-width:920px;margin:0 auto 10px;
+  padding:12px 18px;
+  background:rgba(255,170,0,.05);
+  border:1px solid rgba(255,170,0,.25);
+  border-radius:8px;
+  font-family:var(--sans);font-size:11px;
+  color:var(--text);line-height:1.65;text-align:left;
+}
+.disclaimer .dc-head{
+  display:block;color:var(--amber);font-weight:700;
+  font-size:12px;margin-bottom:6px;letter-spacing:1px;
+}
+.disclaimer .dc-row{display:block;margin-bottom:4px}
+.disclaimer .dc-row:last-child{margin-bottom:0}
+.disclaimer strong{color:var(--text-hi)}
+.foot-meta{
+  font-family:var(--mono);font-size:10px;
+  color:var(--text-dim);
+}
 
 /* ============================================================
    RESPONSIVE
@@ -713,8 +734,37 @@ main{
 
 <!-- ═══════════════════ FOOTER ═══════════════════ -->
 <div class="page-foot">
-  資料來源：台灣證券交易所 (TWSE MIS) &nbsp;·&nbsp; 資料僅供參考，不構成投資建議
-  &nbsp;·&nbsp; 最後更新：<span id="lastUpdate">--</span>
+  <div class="disclaimer">
+    <span class="dc-head">⚠ 免責聲明 DISCLAIMER</span>
+    <span class="dc-row">
+      <strong>1. 投資風險警語：</strong>
+      本網站所提供之股票報價、五檔買賣、漲跌等資訊僅供
+      <strong>個人參考</strong>，不構成任何投資建議、要約或勸誘。
+      股票投資具有高度風險，投資人應自行評估並承擔投資結果之全部責任。
+    </span>
+    <span class="dc-row">
+      <strong>2. 資料正確性：</strong>
+      行情資料來源為台灣證券交易所 (TWSE MIS) 之延遲報價，
+      因網路傳輸、CORS Proxy 或快取等因素，
+      <strong>可能存在延遲、中斷或錯誤</strong>，請以官方交易系統為準。
+    </span>
+    <span class="dc-row">
+      <strong>3. 禁止商業使用：</strong>
+      本網站僅供
+      <strong>個人非商業性質之學習與研究</strong>使用。
+      <strong>嚴禁</strong>將本網站之介面、程式碼或資料用於任何
+      <strong>商業、營利、轉售、廣告、付費服務或代客操作</strong>等用途。
+    </span>
+    <span class="dc-row">
+      <strong>4. 著作權：</strong>
+      行情資料著作權屬台灣證券交易所所有；本網站之程式碼僅供
+      非商業性質之 fork / 研究使用，不得用於營利目的。
+    </span>
+  </div>
+  <div class="foot-meta">
+    Fly's Stock Market &nbsp;·&nbsp; 資料來源：TWSE MIS
+    &nbsp;·&nbsp; 最後更新：<span id="lastUpdate">--</span>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
