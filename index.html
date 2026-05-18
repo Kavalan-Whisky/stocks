@@ -270,8 +270,8 @@ body.light header { background: rgba(240,244,248,.97); }
 .tick-code{color:var(--text-dim)}
 .tick-price{font-weight:bold}
 .tick-pct{font-size:10px}
-.up{color:var(--green)}
-.dn{color:var(--red)}
+.up{color:var(--red)}
+.dn{color:var(--green)}
 .flat{color:var(--text-dim)}
 
 /* ============================================================
@@ -313,8 +313,8 @@ main{
 }
 .sc-label{color:var(--text-dim)}
 .sc-val{font-weight:bold;color:var(--text-hi)}
-.sc-val.up{color:var(--green)}
-.sc-val.dn{color:var(--red)}
+.sc-val.up{color:var(--red)}
+.sc-val.dn{color:var(--green)}
 .sc-val.amber{color:var(--amber)}
 
 /* Category tabs */
@@ -382,12 +382,12 @@ main{
   content:'';position:absolute;top:0;left:0;right:0;height:2px;
   background:var(--border2);transition:background .3s;
 }
-.card.card-up::before{background:var(--green)}
-.card.card-dn::before{background:var(--red)}
+.card.card-up::before{background:var(--red)}
+.card.card-dn::before{background:var(--green)}
 .card.card-flat::before{background:var(--border2)}
 .card:hover{transform:translateY(-2px);box-shadow:0 10px 40px rgba(0,0,0,.5)}
-.card.card-up:hover{border-color:rgba(0,232,122,.25)}
-.card.card-dn:hover{border-color:rgba(255,45,94,.25)}
+.card.card-up:hover{border-color:rgba(255,45,94,.25)}
+.card.card-dn:hover{border-color:rgba(0,232,122,.25)}
 
 .card.flash{animation:flash-anim .6s ease}
 @keyframes flash-anim{
@@ -434,8 +434,8 @@ main{
   font-size:30px;font-weight:bold;line-height:1;
   transition:color .3s;
 }
-.c-price.up{color:var(--green)}
-.c-price.dn{color:var(--red)}
+.c-price.up{color:var(--red)}
+.c-price.dn{color:var(--green)}
 .c-price.flat{color:var(--text-hi)}
 .c-price.none{color:var(--text-dim);font-size:22px}
 .c-change{
@@ -443,8 +443,8 @@ main{
   font-family:var(--mono);font-size:12px;line-height:1.3;
 }
 .c-change .arrow{font-size:13px;margin-right:3px}
-.c-change.up{color:var(--green)}
-.c-change.dn{color:var(--red)}
+.c-change.up{color:var(--red)}
+.c-change.dn{color:var(--green)}
 .c-change.flat{color:var(--text-dim)}
 .c-change .pct{font-size:11px;opacity:.85}
 
@@ -456,8 +456,8 @@ main{
 .ohlc-cell{text-align:center;padding:5px 2px;background:var(--surface2);border-radius:4px}
 .ohlc-lbl{display:block;font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:2px}
 .ohlc-val{font-family:var(--mono);font-size:11px;color:var(--text)}
-.ohlc-val.up{color:var(--green)}
-.ohlc-val.dn{color:var(--red)}
+.ohlc-val.up{color:var(--red)}
+.ohlc-val.dn{color:var(--green)}
 
 /* Bid/Ask 5 levels */
 .ba-wrap{
@@ -470,8 +470,8 @@ main{
   padding:6px 8px;
   border:1px solid var(--border);
 }
-.ba-side.buy{border-left:2px solid var(--green)}
-.ba-side.sell{border-left:2px solid var(--red)}
+.ba-side.buy{border-left:2px solid var(--red)}
+.ba-side.sell{border-left:2px solid var(--green)}
 .ba-head{
   font-family:var(--mono);font-size:9px;
   color:var(--text-dim);letter-spacing:1px;
@@ -479,8 +479,8 @@ main{
   padding-bottom:4px;margin-bottom:4px;
   border-bottom:1px dashed var(--border);
 }
-.ba-head .label-buy{color:var(--green)}
-.ba-head .label-sell{color:var(--red)}
+.ba-head .label-buy{color:var(--red)}
+.ba-head .label-sell{color:var(--green)}
 .ba-row{
   display:flex;justify-content:space-between;align-items:center;
   font-family:var(--mono);font-size:11px;
@@ -491,11 +491,11 @@ main{
   position:absolute;top:0;bottom:0;
   z-index:-1;border-radius:2px;opacity:.18;
 }
-.ba-side.buy .bar{right:0;background:var(--green)}
-.ba-side.sell .bar{left:0;background:var(--red)}
+.ba-side.buy .bar{right:0;background:var(--red)}
+.ba-side.sell .bar{left:0;background:var(--green)}
 .ba-price{font-weight:bold;letter-spacing:.3px}
-.ba-side.buy .ba-price{color:var(--green)}
-.ba-side.sell .ba-price{color:var(--red)}
+.ba-side.buy .ba-price{color:var(--red)}
+.ba-side.sell .ba-price{color:var(--green)}
 .ba-vol{color:var(--text-dim);font-size:10px}
 .ba-empty{text-align:center;color:var(--text-mute);font-size:10px;padding:8px 0;font-family:var(--mono)}
 
@@ -513,7 +513,7 @@ main{
 }
 .range-fill{
   position:absolute;top:0;left:0;right:0;height:100%;
-  background:linear-gradient(90deg,var(--red) 0%,#666 50%,var(--green) 100%);
+  background:linear-gradient(90deg,var(--green) 0%,#666 50%,var(--red) 100%);
   border-radius:2px;opacity:.4;
 }
 .range-y-mark{
