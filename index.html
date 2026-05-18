@@ -41,6 +41,7 @@ body {
   font-family: var(--sans);
   min-height: 100vh;
   overflow-x: hidden;
+  zoom: var(--ui-scale, 1);
 }
 body::before {
   content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
@@ -171,6 +172,32 @@ header {
 .refresh-btn:hover{border-color:var(--blue);color:var(--blue)}
 .refresh-btn.spinning{color:var(--green);border-color:var(--green)}
 #countdown{display:inline-block;min-width:18px;text-align:right;color:var(--text)}
+
+/* FONT SIZE CONTROL */
+.fz-wrap{
+  display:inline-flex;align-items:center;gap:0;
+  border:1px solid var(--border2);border-radius:5px;
+  overflow:hidden;
+}
+.fz-btn{
+  background:none;border:none;
+  color:var(--text-dim);
+  font-family:var(--sans);
+  font-weight:700;cursor:pointer;
+  padding:5px 9px;
+  transition:all .15s;
+  line-height:1;
+}
+.fz-btn:hover{background:var(--surface3);color:var(--blue)}
+.fz-btn.minus{font-size:11px}
+.fz-btn.plus{font-size:14px}
+.fz-btn.reset{
+  font-size:9px;font-family:var(--mono);
+  padding:5px 7px;color:var(--text-mute);
+  border-left:1px solid var(--border);
+  border-right:1px solid var(--border);
+}
+.fz-btn:disabled{opacity:.3;cursor:not-allowed}
 
 /* ============================================================
    TICKER TAPE
@@ -592,6 +619,12 @@ main{
              onfocus="onSearchInput()"
              onblur="setTimeout(()=>hideSearchDD(),200)">
       <div class="search-dd" id="searchDD"></div>
+    </div>
+
+    <div class="fz-wrap" title="調整文字大小">
+      <button class="fz-btn minus" onclick="changeFont(-1)">A−</button>
+      <button class="fz-btn reset" onclick="changeFont(0)" id="fzReset">100%</button>
+      <button class="fz-btn plus"  onclick="changeFont(1)">A+</button>
     </div>
 
     <div class="refresh-wrap">
@@ -1196,7 +1229,7 @@ let isRefreshing = false;
 let searchHL     = -1;   // highlighted dropdown index
 
 const REFRESH_OPEN  = 10;   // seconds, market open
-const REFRESH_CLOSE = 60;   // seconds, market closed
+const REFRESH_CLOSE = 10;   // seconds, market closed (always 10s)
 
 /* ============================================================
    HELPERS
@@ -1263,6 +1296,35 @@ function toast(msg,type=''){
   el.className='toast show '+(type||'');
   clearTimeout(el._t);
   el._t=setTimeout(()=>el.className='toast',2400);
+}
+
+/* ============================================================
+   FONT SCALE
+   ============================================================ */
+const FZ_STEPS = [0.75, 0.85, 1.0, 1.15, 1.30, 1.50, 1.75];
+let fzIdx = 2; // default 1.0
+function applyFont(){
+  const scale = FZ_STEPS[fzIdx];
+  document.body.style.setProperty('--ui-scale', scale);
+  const el = document.getElementById('fzReset');
+  if(el) el.textContent = Math.round(scale*100)+'%';
+  try{ localStorage.setItem('twmkt_fz', String(fzIdx)); }catch(_){}
+}
+function changeFont(dir){
+  if(dir===0){ fzIdx = 2; }
+  else if(dir<0){ fzIdx = Math.max(0, fzIdx-1); }
+  else { fzIdx = Math.min(FZ_STEPS.length-1, fzIdx+1); }
+  applyFont();
+}
+function loadFont(){
+  try{
+    const s = localStorage.getItem('twmkt_fz');
+    if(s!==null){
+      const n = parseInt(s,10);
+      if(!isNaN(n) && n>=0 && n<FZ_STEPS.length) fzIdx = n;
+    }
+  }catch(_){}
+  applyFont();
 }
 
 /* ============================================================
@@ -1896,6 +1958,7 @@ function tick(){
    INIT
    ============================================================ */
 function init(){
+  loadFont();
   loadWatch();
   setMode('watch');
   renderStats();
