@@ -33,6 +33,27 @@
   --sans:      'Noto Sans TC', sans-serif;
   --logo:      'Orbitron', sans-serif;
 }
+/* ── LIGHT MODE ── */
+body.light {
+  --bg:        #f0f4f8;
+  --surface:   #ffffff;
+  --surface2:  #f5f7fa;
+  --surface3:  #e8edf3;
+  --surface4:  #dde4ed;
+  --border:    #cdd5e0;
+  --border2:   #b0bfcf;
+  --green:     #00a855;
+  --green-dim: rgba(0,168,85,0.10);
+  --red:       #e0173f;
+  --red-dim:   rgba(224,23,63,0.10);
+  --blue:      #0077cc;
+  --blue-dim:  rgba(0,119,204,0.08);
+  --amber:     #cc7700;
+  --text:      #374151;
+  --text-dim:  #7a8fa6;
+  --text-mute: #aab8c8;
+  --text-hi:   #111827;
+}
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 html { scroll-behavior: smooth; }
 body {
@@ -49,11 +70,15 @@ body::before {
     linear-gradient(rgba(0,170,255,.022) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0,170,255,.022) 1px, transparent 1px);
   background-size: 48px 48px;
+  transition: opacity .3s;
 }
+body.light::before { opacity: 0; }
 body::after {
   content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   background: radial-gradient(ellipse at 50% 0%, transparent 60%, rgba(0,0,0,.6) 100%);
+  transition: opacity .3s;
 }
+body.light::after { opacity: 0; }
 
 /* ============================================================
    SCROLLBAR
@@ -71,7 +96,9 @@ header {
   background: rgba(7,11,17,.96);
   backdrop-filter: blur(24px);
   border-bottom: 1px solid var(--border);
+  transition: background .3s;
 }
+body.light header { background: rgba(240,244,248,.97); }
 .header-bar {
   display:flex;align-items:center;gap:14px;
   padding:0 24px;height:58px;
@@ -172,6 +199,20 @@ header {
 .refresh-btn:hover{border-color:var(--blue);color:var(--blue)}
 .refresh-btn.spinning{color:var(--green);border-color:var(--green)}
 #countdown{display:inline-block;min-width:18px;text-align:right;color:var(--text)}
+
+/* THEME TOGGLE */
+.theme-btn{
+  background:none;
+  border:1px solid var(--border2);
+  color:var(--text-dim);
+  border-radius:5px;
+  padding:5px 10px;
+  font-size:15px;
+  cursor:pointer;
+  transition:all .2s;
+  line-height:1;
+}
+.theme-btn:hover{border-color:var(--blue);color:var(--blue)}
 
 /* FONT SIZE CONTROL */
 .fz-wrap{
@@ -620,6 +661,8 @@ main{
              onblur="setTimeout(()=>hideSearchDD(),200)">
       <div class="search-dd" id="searchDD"></div>
     </div>
+
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="切換日/夜模式">🌙</button>
 
     <div class="fz-wrap" title="調整文字大小">
       <button class="fz-btn minus" onclick="changeFont(-1)">A−</button>
@@ -1299,6 +1342,28 @@ function toast(msg,type=''){
 }
 
 /* ============================================================
+   THEME
+   ============================================================ */
+let isLight = false;
+function applyTheme(){
+  document.body.classList.toggle('light', isLight);
+  const btn = document.getElementById('themeBtn');
+  if(btn) btn.textContent = isLight ? '🌞' : '🌙';
+  try{ localStorage.setItem('twmkt_theme', isLight ? 'light' : 'dark'); }catch(_){}
+}
+function toggleTheme(){
+  isLight = !isLight;
+  applyTheme();
+}
+function loadTheme(){
+  try{
+    const s = localStorage.getItem('twmkt_theme');
+    if(s) isLight = (s === 'light');
+  }catch(_){}
+  applyTheme();
+}
+
+/* ============================================================
    FONT SCALE
    ============================================================ */
 const FZ_STEPS = [0.75, 0.85, 1.0, 1.15, 1.30, 1.50, 1.75];
@@ -1958,6 +2023,7 @@ function tick(){
    INIT
    ============================================================ */
 function init(){
+  loadTheme();
   loadFont();
   loadWatch();
   setMode('watch');
