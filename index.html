@@ -1748,7 +1748,11 @@ async function doRefresh(){
     results.forEach(item=>{
       const code=item.c;
       const prev=cache[code];
-      const flash = prev && (prev.z!==item.z || prev.tv!==item.tv);
+      // Detect price change using resolved current price so stocks
+      // without a fresh 'z' (mid-derived) also flash on bid/ask moves.
+      const prevP = prev ? getCurPrice(prev) : null;
+      const newP  = getCurPrice(item);
+      const flash = prev && (prevP !== newP || prev.tv !== item.tv);
       cache[code]=item;
       if(flash)cache[code]._flash=true;
     });
@@ -2130,8 +2134,7 @@ function cardHTML(code){
     </div>`;
   }
 
-  const z   = fp(d.z);          // raw last-match price (may be null)
-  const p   = getCurPrice(d);   // resolved current price (fallback to bid/ask mid)
+  const p   = getCurPrice(d);   // current price (z, or bid/ask mid fallback)
   const y   = fp(d.y);
   const o   = fp(d.o);
   const hi  = fp(d.h);
