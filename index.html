@@ -1548,6 +1548,23 @@ function splitFive(s){
   return s.split('_').filter(x=>x!==''&&x!=='-');
 }
 
+/* Current price: prefer last match (z); fall back to bid/ask mid
+   (TWSE's z field is often "-" between 5-second auction windows
+   even though best bid/ask are present and accurate). */
+function getCurPrice(d){
+  if(!d) return null;
+  const z = fp(d.z);
+  if(z !== null) return z;
+  const bids = splitFive(d.b);
+  const asks = splitFive(d.a);
+  const b0 = bids.length ? parseFloat(bids[0]) : NaN;
+  const a0 = asks.length ? parseFloat(asks[0]) : NaN;
+  if(!isNaN(b0) && !isNaN(a0)) return +((b0+a0)/2).toFixed(2);
+  if(!isNaN(b0)) return +b0.toFixed(2);
+  if(!isNaN(a0)) return +a0.toFixed(2);
+  return null;
+}
+
 /* ============================================================
    TOAST
    ============================================================ */
@@ -1977,7 +1994,7 @@ function renderStats(){
   watchlist.forEach(c=>{
     const d=cache[c];
     if(!d)return;
-    const p=fp(d.z),y=fp(d.y);
+    const p=getCurPrice(d),y=fp(d.y);
     if(p===null||y===null)return;
     if(p>y)up++;else if(p<y)dn++;
     const pv=pct(p-y,y);
@@ -2004,7 +2021,7 @@ function renderTicker(){
     const info=STOCK_DB[c]||{n:c};
     const d=cache[c];
     if(!d)return `<span class="tick-item flat"><span class="tick-code">${c}</span><span>${esc(info.n)}</span><span class="tick-price">--</span></span>`;
-    const p=fp(d.z),y=fp(d.y);
+    const p=getCurPrice(d),y=fp(d.y);
     const chg=p!==null&&y!==null?p-y:null;
     const pctv=pct(chg,y);
     const cls=clsOf(chg);
@@ -2113,7 +2130,8 @@ function cardHTML(code){
     </div>`;
   }
 
-  const p   = fp(d.z);
+  const z   = fp(d.z);          // raw last-match price (may be null)
+  const p   = getCurPrice(d);   // resolved current price (fallback to bid/ask mid)
   const y   = fp(d.y);
   const o   = fp(d.o);
   const hi  = fp(d.h);
