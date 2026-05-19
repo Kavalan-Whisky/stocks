@@ -3265,29 +3265,42 @@ const INTL_SYMBOLS = [
   {sym:'^HSI',     name:'恆生'},
   {sym:'TWD=X',    name:'USD/TWD'},
 ];
-async function fetchIntl(){
-  const symbols = INTL_SYMBOLS.map(x=>x.sym).join(',');
-  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbols)}`;
-  for(const proxy of PROXIES){
+/* Yahoo v8 chart endpoint works without auth crumb (unlike v7/quote).
+   Returns { chart: { result: [{ meta: { regularMarketPrice, chartPreviousClose, ... } }] } } */
+async function fetchOneIntl(sym){
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=5d`;
+  // Try direct first, then proxies
+  const candidates = [u=>u, ...PROXIES];
+  for(const wrap of candidates){
     try{
-      const r = await fetch(proxy(url), {signal: AbortSignal.timeout(8000)});
+      const r = await fetch(wrap(url), {signal: AbortSignal.timeout(8000)});
       if(!r.ok) continue;
       const t = await r.text();
       const j = JSON.parse(t);
-      const arr = j?.quoteResponse?.result;
-      if(!arr || !arr.length) continue;
-      arr.forEach(q=>{
-        intlData[q.symbol] = {
-          price: q.regularMarketPrice,
-          prev:  q.regularMarketPreviousClose,
-          chg:   q.regularMarketChange,
-          pct:   q.regularMarketChangePercent,
-        };
-      });
-      renderIntl();
-      return;
+      const meta = j?.chart?.result?.[0]?.meta;
+      if(!meta) continue;
+      const price = meta.regularMarketPrice;
+      const prev  = meta.chartPreviousClose ?? meta.previousClose;
+      if(typeof price !== 'number' || typeof prev !== 'number') continue;
+      const chg = price - prev;
+      const pct = prev ? (chg/prev*100) : 0;
+      return {price, prev, chg, pct};
     }catch(_){}
   }
+  return null;
+}
+async function fetchIntl(){
+  const results = await Promise.allSettled(
+    INTL_SYMBOLS.map(s => fetchOneIntl(s.sym).then(d => ({sym: s.sym, d})))
+  );
+  let any = false;
+  results.forEach(r=>{
+    if(r.status === 'fulfilled' && r.value && r.value.d){
+      intlData[r.value.sym] = r.value.d;
+      any = true;
+    }
+  });
+  if(any) renderIntl();
 }
 function renderIntl(){
   const el = document.getElementById('intlRow');
