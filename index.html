@@ -571,28 +571,47 @@ main{
 /* Browse list (compact) */
 .browse-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
   gap:8px;
 }
 .browse-item{
-  display:flex;align-items:center;gap:10px;
+  display:flex;align-items:center;gap:8px;
   background:var(--surface);
   border:1px solid var(--border);
   border-radius:6px;
   padding:9px 12px;
   cursor:pointer;
   transition:all .15s;
+  position:relative;
 }
 .browse-item:hover{border-color:var(--blue);background:var(--surface2);transform:translateX(2px)}
-.browse-item.in-list{opacity:.5;cursor:default}
-.browse-item.in-list:hover{border-color:var(--border);transform:none}
-.bi-code{font-family:var(--mono);font-size:12px;color:var(--blue);min-width:48px}
-.bi-name{flex:1;font-size:13px;color:var(--text-hi)}
-.bi-add{
-  font-family:var(--mono);font-size:11px;color:var(--green);
-  letter-spacing:1px;
+.browse-item.in-list{opacity:.55}
+.browse-item.in-list:hover{transform:none}
+.bi-code{font-family:var(--mono);font-size:12px;color:var(--blue);min-width:50px;flex-shrink:0}
+.bi-name{
+  flex:1;font-size:13px;color:var(--text-hi);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.browse-item.in-list .bi-add{color:var(--text-mute);content:'已加'}
+.bi-price{
+  font-family:var(--mono);font-size:13px;font-weight:700;
+  color:var(--text);text-align:right;min-width:54px;flex-shrink:0;
+}
+.bi-price.up{color:var(--red)}
+.bi-price.dn{color:var(--green)}
+.bi-price.flat{color:var(--text-dim)}
+.bi-price.none{color:var(--text-mute);font-size:11px;font-weight:normal}
+.bi-chg{
+  font-family:var(--mono);font-size:10px;
+  min-width:50px;text-align:right;flex-shrink:0;
+}
+.bi-chg.up{color:var(--red)}
+.bi-chg.dn{color:var(--green)}
+.bi-chg.flat,.bi-chg.none{color:var(--text-mute)}
+.bi-add{
+  font-family:var(--mono);font-size:13px;color:var(--green);
+  letter-spacing:1px;width:14px;text-align:center;flex-shrink:0;
+}
+.browse-item.in-list .bi-add{color:var(--amber)}
 
 /* ============================================================
    FOOTER
@@ -2245,16 +2264,25 @@ async function fetchTWSE(codes){
 }
 
 async function doRefresh(){
-  if(isRefreshing||watchlist.length===0)return;
+  if(isRefreshing) return;
+  // Build list to fetch: always watchlist + in browse mode, also visible browse codes
+  const fetchSet = new Set(watchlist);
+  if(mode === 'browse'){
+    let bl = Object.keys(STOCK_DB);
+    if(activeCat !== '全部') bl = bl.filter(c=>getCategoryFor(c)===activeCat);
+    bl.slice(0, BROWSE_FETCH_CAP).forEach(c => fetchSet.add(c));
+  }
+  if(fetchSet.size === 0) return;
   isRefreshing=true;
   document.getElementById('refreshBtn').classList.add('spinning');
 
+  const codes = [...fetchSet];
   const BATCH=25;
   const results=[];
   let anyOk=false;
 
-  for(let i=0;i<watchlist.length;i+=BATCH){
-    const batch=watchlist.slice(i,i+BATCH);
+  for(let i=0;i<codes.length;i+=BATCH){
+    const batch=codes.slice(i,i+BATCH);
     const data=await fetchTWSE(batch);
     if(data){anyOk=true;results.push(...data);}
   }
@@ -2280,6 +2308,8 @@ async function doRefresh(){
     if(mode==='watch'){
       renderGrid();
       renderStats();
+    }else if(mode==='browse'){
+      renderBrowseGrid();
     }
     renderTicker();
     document.getElementById('lastUpdate').textContent=fmtTime();
@@ -2456,6 +2486,7 @@ function setMode(m){
                 : '瀏覽完整股票資料庫，點擊即可加入自選';
   renderTabs();
   renderGrid();
+  if(m === 'browse') fetchBrowseVisible();
 }
 
 /* ============================================================
@@ -2498,6 +2529,7 @@ function setTab(cat){
   activeCat=cat;
   renderTabs();
   renderGrid();
+  if(mode === 'browse') fetchBrowseVisible();
 }
 
 /* ============================================================
@@ -2626,7 +2658,7 @@ function renderGrid(){
     cnt ? '含五檔買賣與盤中走勢 '+(sortLbls[sortMode]||'') : '';
 
   // Show sort row only in watch mode
-  document.getElementById('sortRow').style.display = mode==='watch' ? '' : 'none';
+  document.getElementById('sortRow').style.display = '';
 
   if(!cnt){
     document.getElementById('grid').className='stock-grid';
@@ -2652,34 +2684,94 @@ function renderGrid(){
 }
 
 /* ============================================================
-   GRID — BROWSE MODE (compact list)
+   GRID — BROWSE MODE (compact list, with prices + sort)
    ============================================================ */
+const BROWSE_FETCH_CAP = 100;  // limit price-fetch per category to avoid hammering API
+
 function renderBrowseGrid(){
   let list=Object.keys(STOCK_DB);
   if(activeCat!=='全部') list=list.filter(c=>getCategoryFor(c)===activeCat);
 
-  document.getElementById('sectionTitle').querySelector('span').textContent=
-    `${activeCat==='全部'?'全部股票':activeCat} · ${list.length} 檔`;
-  document.getElementById('sectionHint').textContent='點擊即可加入自選';
+  // Build sortable items
+  const items = list.map(c=>{
+    const info=STOCK_DB[c];
+    const d=cache[c];
+    const p = d ? getCurPrice(d) : null;
+    const y = d ? fp(d.y) : null;
+    const chg = (p!==null && y!==null) ? p-y : null;
+    const pctv = pct(chg, y);
+    const v = d ? parseInt(d.v||0) : 0;
+    return {code:c, info, p, y, chg, pctv, v};
+  });
 
-  // Sort by code
-  list.sort();
+  // Apply sort
+  if(sortMode === 'gainers')      items.sort((a,b)=>(b.pctv ?? -Infinity)-(a.pctv ?? -Infinity));
+  else if(sortMode === 'losers')  items.sort((a,b)=>(a.pctv ??  Infinity)-(b.pctv ??  Infinity));
+  else if(sortMode === 'absmove') items.sort((a,b)=>Math.abs(b.pctv ?? 0)-Math.abs(a.pctv ?? 0));
+  else if(sortMode === 'vol')     items.sort((a,b)=>b.v - a.v);
+  else                            items.sort((a,b)=>a.code.localeCompare(b.code));  // manual → by code
+
+  const sortLbls = {manual:'按代號',gainers:'漲幅排序',losers:'跌幅排序',absmove:'波動排序',vol:'量排序'};
+  document.getElementById('sectionTitle').querySelector('span').textContent=
+    `${activeCat==='全部'?'全部股票':activeCat} · ${items.length} 檔`;
+  document.getElementById('sectionHint').textContent=
+    `${sortLbls[sortMode]||'按代號'} · 點擊加入自選`;
+
+  // Show sort row in browse mode too
+  document.getElementById('sortRow').style.display = '';
 
   document.getElementById('grid').className='browse-grid';
-  if(!list.length){
+  if(!items.length){
     document.getElementById('grid').innerHTML=
       `<div class="empty"><strong>∅</strong>此分類無資料</div>`;
     return;
   }
-  document.getElementById('grid').innerHTML=list.map(c=>{
-    const info=STOCK_DB[c];
-    const inList=watchlist.includes(c);
+  document.getElementById('grid').innerHTML=items.map(it=>{
+    const c = it.code;
+    const inList = watchlist.includes(c);
+    let priceHTML, chgHTML;
+    if(it.p === null){
+      priceHTML = `<span class="bi-price none">--</span>`;
+      chgHTML   = `<span class="bi-chg none">--</span>`;
+    }else{
+      const cls = it.chg===null?'flat':(it.chg>0?'up':it.chg<0?'dn':'flat');
+      priceHTML = `<span class="bi-price ${cls}">${it.p.toFixed(2)}</span>`;
+      chgHTML   = `<span class="bi-chg ${cls}">${it.pctv!==null?(it.pctv>=0?'+':'')+it.pctv.toFixed(2)+'%':'--'}</span>`;
+    }
     return `<div class="browse-item ${inList?'in-list':''}" onclick="${inList?'':`pickSearch('${c}')`}">
       <span class="bi-code">${c}</span>
-      <span class="bi-name">${esc(info.n)}</span>
-      <span class="bi-add">${inList?'★ 已加':'+ 加入'}</span>
+      <span class="bi-name">${esc(it.info.n)}</span>
+      ${priceHTML}
+      ${chgHTML}
+      <span class="bi-add">${inList?'★':'+'}</span>
     </div>`;
   }).join('');
+}
+
+/* Fetch live quotes for the codes currently visible in browse mode.
+   Capped at BROWSE_FETCH_CAP per render to keep API usage sane. */
+async function fetchBrowseVisible(){
+  if(mode !== 'browse') return;
+  let list = Object.keys(STOCK_DB);
+  if(activeCat !== '全部') list = list.filter(c=>getCategoryFor(c)===activeCat);
+  // Skip already-cached codes that have a 'z' or recent fetch — actually always refetch
+  // when in browse mode so prices stay current with the 10s tick.
+  list = list.slice(0, BROWSE_FETCH_CAP);
+  const BATCH = 25;
+  let any = false;
+  for(let i=0;i<list.length;i+=BATCH){
+    const batch = list.slice(i, i+BATCH);
+    const data = await fetchTWSE(batch);
+    if(data){
+      any = true;
+      data.forEach(item => {
+        cache[item.c] = item;
+        const p = getCurPrice(item);
+        if(p !== null) recordHistory(item.c, p);
+      });
+    }
+  }
+  if(any && mode === 'browse') renderBrowseGrid();
 }
 
 /* ============================================================
