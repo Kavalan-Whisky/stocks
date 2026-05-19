@@ -2268,9 +2268,8 @@ async function doRefresh(){
   // Build list to fetch: always watchlist + in browse mode, also visible browse codes
   const fetchSet = new Set(watchlist);
   if(mode === 'browse'){
-    let bl = Object.keys(STOCK_DB);
-    if(activeCat !== '全部') bl = bl.filter(c=>getCategoryFor(c)===activeCat);
-    bl.slice(0, BROWSE_FETCH_CAP).forEach(c => fetchSet.add(c));
+    // Only refresh codes currently in (or near) the viewport
+    browseVisible.forEach(c => fetchSet.add(c));
   }
   if(fetchSet.size === 0) return;
   isRefreshing=true;
@@ -2486,7 +2485,8 @@ function setMode(m){
                 : '瀏覽完整股票資料庫，點擊即可加入自選';
   renderTabs();
   renderGrid();
-  if(m === 'browse') fetchBrowseVisible();
+  // (browse-mode initial fetches are triggered by the IntersectionObserver
+  //  that setupBrowseObserver attaches inside renderBrowseGrid)
 }
 
 /* ============================================================
@@ -2529,7 +2529,6 @@ function setTab(cat){
   activeCat=cat;
   renderTabs();
   renderGrid();
-  if(mode === 'browse') fetchBrowseVisible();
 }
 
 /* ============================================================
@@ -2686,8 +2685,6 @@ function renderGrid(){
 /* ============================================================
    GRID — BROWSE MODE (compact list, with prices + sort)
    ============================================================ */
-const BROWSE_FETCH_CAP = 100;  // limit price-fetch per category to avoid hammering API
-
 function renderBrowseGrid(){
   let list=Object.keys(STOCK_DB);
   if(activeCat!=='全部') list=list.filter(c=>getCategoryFor(c)===activeCat);
@@ -2738,7 +2735,7 @@ function renderBrowseGrid(){
       priceHTML = `<span class="bi-price ${cls}">${it.p.toFixed(2)}</span>`;
       chgHTML   = `<span class="bi-chg ${cls}">${it.pctv!==null?(it.pctv>=0?'+':'')+it.pctv.toFixed(2)+'%':'--'}</span>`;
     }
-    return `<div class="browse-item ${inList?'in-list':''}" onclick="${inList?'':`pickSearch('${c}')`}">
+    return `<div class="browse-item ${inList?'in-list':''}" data-code="${c}" onclick="${inList?'':`pickSearch('${c}')`}">
       <span class="bi-code">${c}</span>
       <span class="bi-name">${esc(it.info.n)}</span>
       ${priceHTML}
@@ -2746,32 +2743,92 @@ function renderBrowseGrid(){
       <span class="bi-add">${inList?'★':'+'}</span>
     </div>`;
   }).join('');
+
+  // Wire up lazy loading after rendering
+  setupBrowseObserver();
 }
 
-/* Fetch live quotes for the codes currently visible in browse mode.
-   Capped at BROWSE_FETCH_CAP per render to keep API usage sane. */
-async function fetchBrowseVisible(){
+/* ============================================================
+   BROWSE-MODE LAZY LOADING (IntersectionObserver)
+   ============================================================
+   - Items become 'visible' when within 600 px of the viewport
+     (both directions), preloading what's about to scroll in.
+   - Visible codes that aren't in cache get queued + batched.
+   - The 10 s refresh also targets only currently-visible codes,
+     so off-screen rows don't waste API budget. */
+let browseObserver  = null;
+let browseVisible   = new Set();
+let browseFetchQ    = new Set();
+let browseFetchTimer= null;
+
+function setupBrowseObserver(){
+  // Tear down previous (browse-grid was re-rendered)
+  if(browseObserver){ browseObserver.disconnect(); browseObserver=null; }
+  browseVisible.clear();
   if(mode !== 'browse') return;
-  let list = Object.keys(STOCK_DB);
-  if(activeCat !== '全部') list = list.filter(c=>getCategoryFor(c)===activeCat);
-  // Skip already-cached codes that have a 'z' or recent fetch — actually always refetch
-  // when in browse mode so prices stay current with the 10s tick.
-  list = list.slice(0, BROWSE_FETCH_CAP);
-  const BATCH = 25;
-  let any = false;
-  for(let i=0;i<list.length;i+=BATCH){
-    const batch = list.slice(i, i+BATCH);
-    const data = await fetchTWSE(batch);
-    if(data){
-      any = true;
-      data.forEach(item => {
-        cache[item.c] = item;
-        const p = getCurPrice(item);
-        if(p !== null) recordHistory(item.c, p);
-      });
-    }
+  if(!('IntersectionObserver' in window)){
+    // Fallback: mark all as visible
+    document.querySelectorAll('.browse-item[data-code]').forEach(el=>{
+      const c = el.dataset.code;
+      browseVisible.add(c);
+      if(!cache[c]) browseFetchQ.add(c);
+    });
+    if(browseFetchQ.size) scheduleBrowseFetch();
+    return;
   }
-  if(any && mode === 'browse') renderBrowseGrid();
+  browseObserver = new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      const c = e.target.dataset.code;
+      if(!c) return;
+      if(e.isIntersecting){
+        browseVisible.add(c);
+        if(!cache[c]) browseFetchQ.add(c);
+      }else{
+        browseVisible.delete(c);
+      }
+    });
+    if(browseFetchQ.size) scheduleBrowseFetch();
+  },{
+    root: null,
+    rootMargin: '600px 0px 600px 0px',  // 600 px lookahead above & below
+    threshold: 0,
+  });
+  document.querySelectorAll('.browse-item[data-code]').forEach(el=>{
+    browseObserver.observe(el);
+  });
+}
+
+function scheduleBrowseFetch(){
+  if(browseFetchTimer) return;   // already pending
+  browseFetchTimer = setTimeout(async ()=>{
+    browseFetchTimer = null;
+    if(browseFetchQ.size === 0) return;
+    // Take up to 75 per round so a long scroll doesn't fire a giant request
+    const all = [...browseFetchQ];
+    browseFetchQ.clear();
+    const round = all.slice(0, 75);
+    all.slice(75).forEach(c => browseFetchQ.add(c));
+
+    const BATCH = 25;
+    let any = false;
+    for(let i=0;i<round.length;i+=BATCH){
+      const batch = round.slice(i, i+BATCH);
+      const data = await fetchTWSE(batch);
+      if(data){
+        any = true;
+        data.forEach(item=>{
+          cache[item.c] = item;
+          const p = getCurPrice(item);
+          if(p !== null) recordHistory(item.c, p);
+        });
+      }
+    }
+    if(any && mode === 'browse'){
+      renderBrowseGrid();
+      setupBrowseObserver();  // re-attach observer to fresh DOM
+    }
+    if(browseFetchQ.size) scheduleBrowseFetch();  // chain next batch
+  }, 150);
 }
 
 /* ============================================================
