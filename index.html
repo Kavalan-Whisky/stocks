@@ -1537,7 +1537,7 @@ const STOCK_DB = {
   '3035':{n:'智原',c:'半導體',e:'tse'},
   '3036':{n:'文曄',c:'半導體',e:'tse'},
   '3041':{n:'揚智',c:'半導體',e:'tse'},
-  '3105':{n:'穩懋',c:'半導體',e:'tse'},
+  '3105':{n:'穩懋',c:'半導體',e:'otc'},
   '3138':{n:'耀登',c:'半導體',e:'otc'},
   '3257':{n:'虹冠電',c:'半導體',e:'otc'},
   '3413':{n:'京鼎',c:'半導體',e:'otc'},
@@ -2240,6 +2240,12 @@ async function fetchTWSE(codes){
     const ex=info?info.e:'tse';
     return `${ex}_${c}.tw`;
   });
+  return fetchTWSEItems(items);
+}
+
+async function fetchTWSEItems(items){
+  // items: array of pre-built ex_code.tw strings
+  if(!items.length) return null;
   const exCh = items.join('|');
   const base = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${exCh}&json=1&delay=0&_=${Date.now()}`;
 
@@ -2284,6 +2290,30 @@ async function doRefresh(){
     const batch=codes.slice(i,i+BATCH);
     const data=await fetchTWSE(batch);
     if(data){anyOk=true;results.push(...data);}
+  }
+
+  // Fallback: any code that didn't return data may have the wrong exchange
+  // configured (tse vs. otc). Retry those once on the opposite exchange and
+  // remember the correction in STOCK_DB so future fetches use the right one.
+  const got = new Set(results.map(r => r.c));
+  const missing = codes.filter(c => !got.has(c));
+  if(missing.length){
+    for(let i=0;i<missing.length;i+=BATCH){
+      const batch = missing.slice(i,i+BATCH);
+      const swapped = batch.map(c => {
+        const ex = STOCK_DB[c]?.e === 'otc' ? 'tse' : 'otc';
+        return `${ex}_${c}.tw`;
+      });
+      const data = await fetchTWSEItems(swapped);
+      if(data){
+        anyOk=true;
+        data.forEach(item => {
+          const c = item.c;
+          if(STOCK_DB[c]) STOCK_DB[c].e = (STOCK_DB[c].e === 'otc' ? 'tse' : 'otc');
+        });
+        results.push(...data);
+      }
+    }
   }
 
   document.getElementById('errorBanner').style.display=anyOk?'none':'block';
@@ -2811,16 +2841,40 @@ function scheduleBrowseFetch(){
 
     const BATCH = 25;
     let any = false;
+    const got = new Set();
     for(let i=0;i<round.length;i+=BATCH){
       const batch = round.slice(i, i+BATCH);
       const data = await fetchTWSE(batch);
       if(data){
         any = true;
         data.forEach(item=>{
+          got.add(item.c);
           cache[item.c] = item;
           const p = getCurPrice(item);
           if(p !== null) recordHistory(item.c, p);
         });
+      }
+    }
+    // Same exchange-swap fallback as doRefresh, for codes that didn't return.
+    const missing = round.filter(c => !got.has(c));
+    if(missing.length){
+      for(let i=0;i<missing.length;i+=BATCH){
+        const batch = missing.slice(i, i+BATCH);
+        const swapped = batch.map(c => {
+          const ex = STOCK_DB[c]?.e === 'otc' ? 'tse' : 'otc';
+          return `${ex}_${c}.tw`;
+        });
+        const data = await fetchTWSEItems(swapped);
+        if(data){
+          any = true;
+          data.forEach(item=>{
+            const c = item.c;
+            if(STOCK_DB[c]) STOCK_DB[c].e = (STOCK_DB[c].e === 'otc' ? 'tse' : 'otc');
+            cache[c] = item;
+            const p = getCurPrice(item);
+            if(p !== null) recordHistory(c, p);
+          });
+        }
       }
     }
     if(any && mode === 'browse'){
