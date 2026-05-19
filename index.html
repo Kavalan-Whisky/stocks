@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>台股即時看板 · Fly's Stock Market</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#070b11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fly Stocks">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23070b11'/%3E%3Ctext x='90' y='118' font-size='80' font-family='monospace' text-anchor='middle' fill='%23ff2d5e' font-weight='900'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23070b11' rx='8'/%3E%3Ctext x='32' y='44' font-size='34' font-family='monospace' text-anchor='middle' fill='%23ff2d5e' font-weight='900'%3EF%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -638,6 +645,265 @@ main{
 }
 
 /* ============================================================
+   SORT ROW
+   ============================================================ */
+.sort-row{
+  display:flex;align-items:center;flex-wrap:wrap;gap:6px;
+  margin-bottom:14px;font-family:var(--mono);font-size:11px;
+}
+.sort-row .sort-label{
+  color:var(--text-dim);letter-spacing:1px;
+  margin-right:4px;
+}
+.sort-btn{
+  background:var(--surface2);border:1px solid var(--border);
+  color:var(--text-dim);border-radius:5px;
+  padding:5px 11px;font-family:var(--sans);font-size:11px;
+  cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:4px;
+}
+.sort-btn:hover{border-color:var(--border2);color:var(--text)}
+.sort-btn.active{background:var(--blue);border-color:var(--blue);color:#000;font-weight:700}
+
+/* ============================================================
+   SPARKLINE
+   ============================================================ */
+.spark-wrap{
+  margin:8px 0 10px;
+  height:36px;
+  background:var(--surface2);
+  border-radius:5px;
+  cursor:pointer;
+  position:relative;
+  overflow:hidden;
+  transition:background .15s;
+}
+.spark-wrap:hover{background:var(--surface3)}
+.spark-wrap svg{display:block;width:100%;height:100%}
+.spark-wrap .spark-y{
+  stroke:var(--text-dim);stroke-width:1;
+  stroke-dasharray:2,3;opacity:.5;
+}
+.spark-wrap .spark-line{
+  fill:none;stroke-width:1.5;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+.spark-wrap .spark-fill{opacity:.18}
+.spark-wrap .spark-line.up{stroke:var(--red)}
+.spark-wrap .spark-fill.up{fill:var(--red)}
+.spark-wrap .spark-line.dn{stroke:var(--green)}
+.spark-wrap .spark-fill.dn{fill:var(--green)}
+.spark-wrap .spark-line.flat{stroke:var(--text-dim)}
+.spark-wrap .spark-fill.flat{fill:var(--text-dim)}
+.spark-wrap .spark-hint{
+  position:absolute;top:3px;right:6px;
+  font-family:var(--mono);font-size:8px;color:var(--text-mute);
+  letter-spacing:.5px;pointer-events:none;
+}
+.spark-wrap .spark-empty{
+  display:flex;align-items:center;justify-content:center;
+  height:100%;font-family:var(--mono);font-size:10px;color:var(--text-mute);
+}
+
+/* ============================================================
+   HOLDING STRIP
+   ============================================================ */
+.holding-strip{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:8px;padding:7px 10px;
+  margin:0 0 10px;border-radius:6px;
+  background:var(--surface2);
+  border:1px solid var(--border);
+  font-family:var(--mono);font-size:11px;
+}
+.holding-strip.profit{border-color:rgba(255,45,94,.35);background:rgba(255,45,94,.06)}
+.holding-strip.loss{border-color:rgba(0,232,122,.35);background:rgba(0,232,122,.06)}
+.hs-left{display:flex;flex-direction:column;line-height:1.4;color:var(--text-dim)}
+.hs-left .hs-cost{font-size:10px}
+.hs-right{display:flex;flex-direction:column;align-items:flex-end;line-height:1.4}
+.hs-pl{font-weight:700;font-size:13px}
+.hs-pl.up{color:var(--red)}
+.hs-pl.dn{color:var(--green)}
+.hs-pl.flat{color:var(--text)}
+.hs-pct{font-size:10px;color:var(--text-dim)}
+
+/* ============================================================
+   CARD ACTION BUTTONS (top-right cluster)
+   ============================================================ */
+.card-actions{
+  position:absolute;top:6px;right:6px;
+  display:flex;gap:2px;
+  opacity:0;transition:opacity .15s;
+}
+.card:hover .card-actions{opacity:.7}
+.card-actions:hover{opacity:1!important}
+.ca-btn{
+  background:none;border:none;
+  color:var(--text-dim);
+  font-size:13px;cursor:pointer;
+  padding:2px 6px;border-radius:4px;line-height:1;
+  transition:color .15s,background .15s;
+}
+.ca-btn:hover{background:var(--surface3);color:var(--blue)}
+.ca-btn.rm:hover{color:var(--red)}
+.ca-btn.alert-on{color:var(--amber);opacity:1}
+.ca-btn.holding-on{color:var(--blue);opacity:1}
+
+/* ============================================================
+   DRAG STATES
+   ============================================================ */
+.card.dragging{opacity:.4}
+.card.drag-over{
+  outline:2px dashed var(--blue);
+  outline-offset:-4px;
+}
+
+/* ============================================================
+   STOCK SETTINGS MODAL
+   ============================================================ */
+.modal-mask{
+  position:fixed;inset:0;z-index:9990;
+  background:rgba(3,6,12,.78);
+  backdrop-filter:blur(4px);
+  display:none;align-items:center;justify-content:center;
+  padding:20px;
+}
+body.light .modal-mask{background:rgba(80,90,105,.72)}
+.modal-mask.show{display:flex}
+.modal-box{
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-radius:12px;
+  max-width:520px;width:100%;
+  max-height:90vh;
+  display:flex;flex-direction:column;
+  box-shadow:0 20px 80px rgba(0,0,0,.7);
+  animation:cbox-in .25s cubic-bezier(.2,.9,.3,1.2);
+}
+.modal-head{
+  padding:14px 20px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.modal-head h3{
+  font-family:var(--sans);font-size:15px;color:var(--text-hi);font-weight:700;
+}
+.modal-head h3 .code{
+  font-family:var(--mono);color:var(--blue);margin-right:8px;font-size:13px;
+}
+.modal-x{
+  background:none;border:none;color:var(--text-dim);
+  font-size:18px;cursor:pointer;padding:2px 6px;border-radius:4px;
+}
+.modal-x:hover{background:var(--surface3);color:var(--red)}
+.modal-body{
+  padding:16px 20px;overflow-y:auto;flex:1;
+  font-family:var(--sans);font-size:13px;
+}
+.modal-section{
+  margin-bottom:18px;
+}
+.modal-section:last-child{margin-bottom:0}
+.ms-title{
+  display:block;font-size:11px;color:var(--text-dim);
+  letter-spacing:2px;text-transform:uppercase;
+  margin-bottom:8px;font-family:var(--mono);
+}
+.modal-row{
+  display:flex;align-items:center;gap:8px;margin-bottom:8px;
+}
+.modal-row label{
+  flex:0 0 90px;font-size:12px;color:var(--text-dim);
+}
+.modal-row input,.modal-row select{
+  flex:1;background:var(--surface2);
+  border:1px solid var(--border2);
+  color:var(--text-hi);
+  font-family:var(--mono);font-size:13px;
+  border-radius:5px;padding:7px 10px;outline:none;
+  transition:border-color .15s;
+}
+.modal-row input:focus,.modal-row select:focus{border-color:var(--blue)}
+.modal-row .hint{
+  font-size:10px;color:var(--text-mute);font-family:var(--mono);
+}
+.modal-foot{
+  padding:12px 20px;border-top:1px solid var(--border);
+  display:flex;justify-content:flex-end;gap:8px;
+}
+.mf-btn{
+  background:none;border:1px solid var(--border2);
+  color:var(--text);
+  border-radius:5px;padding:8px 16px;
+  font-family:var(--sans);font-size:12px;cursor:pointer;
+  transition:all .15s;
+}
+.mf-btn:hover{border-color:var(--blue);color:var(--blue)}
+.mf-btn.primary{
+  background:var(--blue);border-color:var(--blue);color:#000;font-weight:700;
+}
+.mf-btn.primary:hover{background:#22bbff;color:#000}
+.mf-btn.danger{color:var(--red)}
+.mf-btn.danger:hover{border-color:var(--red)}
+
+/* ============================================================
+   CHART MODAL (intraday)
+   ============================================================ */
+.chart-modal .modal-box{max-width:880px}
+.chart-svg-wrap{
+  background:var(--surface2);
+  border-radius:8px;padding:14px;
+  margin-bottom:14px;
+}
+.chart-svg-wrap svg{display:block;width:100%;height:280px}
+.chart-stats{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+  gap:8px;font-family:var(--mono);font-size:11px;
+}
+.cs-cell{
+  background:var(--surface2);border-radius:5px;
+  padding:8px 10px;text-align:center;
+}
+.cs-cell .cs-lbl{display:block;color:var(--text-dim);font-size:9px;margin-bottom:3px}
+.cs-cell .cs-val{color:var(--text-hi);font-weight:700;font-size:13px}
+.cs-cell .cs-val.up{color:var(--red)}
+.cs-cell .cs-val.dn{color:var(--green)}
+
+/* chart axis text */
+.chart-axis{
+  fill:var(--text-dim);font-family:var(--mono);font-size:9px;
+}
+.chart-grid{stroke:var(--border);stroke-width:.5;stroke-dasharray:2,4;opacity:.6}
+.chart-line{fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.chart-line.up{stroke:var(--red)}
+.chart-line.dn{stroke:var(--green)}
+.chart-fill{opacity:.13}
+.chart-fill.up{fill:var(--red)}
+.chart-fill.dn{fill:var(--green)}
+.chart-yline{stroke:var(--text-dim);stroke-dasharray:3,4;opacity:.5;stroke-width:1}
+
+/* ============================================================
+   INTL TICKER (global indices)
+   ============================================================ */
+.intl-row{
+  display:flex;flex-wrap:wrap;gap:6px;
+  margin-bottom:14px;
+  font-family:var(--mono);font-size:11px;
+}
+.intl-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:5px 11px;
+}
+.intl-name{color:var(--text-dim);font-size:10px}
+.intl-price{color:var(--text-hi);font-weight:700}
+.intl-pct{font-size:10px}
+.intl-chip.up{border-color:rgba(255,45,94,.3)}
+.intl-chip.dn{border-color:rgba(0,232,122,.3)}
+.intl-chip.up .intl-price,.intl-chip.up .intl-pct{color:var(--red)}
+.intl-chip.dn .intl-price,.intl-chip.dn .intl-pct{color:var(--green)}
+
+/* ============================================================
    CONSENT MODAL
    ============================================================ */
 .consent-mask{
@@ -845,7 +1111,20 @@ body.light .consent-mask{background:rgba(80,90,105,.78)}
     <div class="stat-chip"><span class="sc-label">載入中</span></div>
   </div>
 
+  <!-- International indices ticker -->
+  <div class="intl-row" id="intlRow"></div>
+
   <div class="tabs" id="tabs"></div>
+
+  <!-- Sort row (rankings) -->
+  <div class="sort-row" id="sortRow">
+    <span class="sort-label">排序</span>
+    <button class="sort-btn active" data-sort="manual"  onclick="setSort('manual')">★ 自訂順序</button>
+    <button class="sort-btn"        data-sort="gainers" onclick="setSort('gainers')">▲ 漲幅</button>
+    <button class="sort-btn"        data-sort="losers"  onclick="setSort('losers')">▼ 跌幅</button>
+    <button class="sort-btn"        data-sort="absmove" onclick="setSort('absmove')">↕ 波動</button>
+    <button class="sort-btn"        data-sort="vol"     onclick="setSort('vol')">📊 成交量</button>
+  </div>
 
   <div class="section-title" id="sectionTitle">
     <span>即時行情</span>
@@ -854,6 +1133,77 @@ body.light .consent-mask{background:rgba(80,90,105,.78)}
 
   <div id="grid" class="stock-grid"></div>
 </main>
+
+<!-- ═══════════════════ STOCK SETTINGS MODAL ═══════════════════ -->
+<div class="modal-mask" id="settingsMask" onclick="if(event.target===this)closeSettings()">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3><span class="code" id="setCode"></span><span id="setName"></span></h3>
+      <button class="modal-x" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="modal-section">
+        <span class="ms-title">💼 持股 / Holdings</span>
+        <div class="modal-row">
+          <label>買入價</label>
+          <input type="number" step="0.01" min="0" id="setCost" placeholder="例如 1050.00">
+        </div>
+        <div class="modal-row">
+          <label>股數</label>
+          <input type="number" step="1" min="0" id="setShares" placeholder="例如 1000">
+          <span class="hint">張數 × 1000</span>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <span class="ms-title">🔔 警示 / Alerts</span>
+        <div class="modal-row">
+          <label>目標漲價</label>
+          <input type="number" step="0.01" min="0" id="setTgtUp" placeholder="≥ 此價提醒">
+        </div>
+        <div class="modal-row">
+          <label>目標跌價</label>
+          <input type="number" step="0.01" min="0" id="setTgtDn" placeholder="≤ 此價提醒">
+        </div>
+        <div class="modal-row">
+          <label>漲跌幅 %</label>
+          <input type="number" step="0.1" min="0" id="setPct" placeholder="例如 3 (達 ±3%)">
+          <span class="hint">超過此 % 提醒</span>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <span class="ms-title">🏷 分類 / Category</span>
+        <div class="modal-row">
+          <label>類別</label>
+          <input type="text" id="setCat" placeholder="如：核心持股">
+          <span class="hint">自訂</span>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="mf-btn danger" onclick="clearStockSettings()">清除</button>
+      <button class="mf-btn" onclick="closeSettings()">取消</button>
+      <button class="mf-btn primary" onclick="saveStockSettings()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ INTRADAY CHART MODAL ═══════════════════ -->
+<div class="modal-mask chart-modal" id="chartMask" onclick="if(event.target===this)closeChart()">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3><span class="code" id="chCode"></span><span id="chName"></span></h3>
+      <button class="modal-x" onclick="closeChart()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="chart-svg-wrap" id="chartSvgWrap"></div>
+      <div class="chart-stats" id="chartStats"></div>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════════════ FOOTER ═══════════════════ -->
 <div class="page-foot">
@@ -1481,16 +1831,26 @@ const DEFAULT_WATCH = [
 /* ============================================================
    STATE
    ============================================================ */
-let watchlist    = [];   // array of codes
+let watchlist    = [];   // array of codes (preserves user order)
 let cache        = {};   // code → TWSE msgArray item
+let history      = {};   // code → [{t, p}, ...] intraday history
+let holdings     = {};   // code → {cost: number, shares: number} portfolio
+let userCats     = {};   // code → string  user-overridden category
+let alerts       = {};   // code → {up:?, dn:?, pct:?} alert thresholds
+let alertFired   = {};   // code+key → epoch; throttle re-firing
+let intlData     = {};   // symbol → {price, prev, name}  international indices
 let activeCat    = '全部';
 let mode         = 'watch';  // 'watch' or 'browse'
+let sortMode     = 'manual'; // manual | gainers | losers | vol | absmove
 let countdown    = 10;
 let isRefreshing = false;
-let searchHL     = -1;   // highlighted dropdown index
+let searchHL     = -1;
+let dragSrcCode  = null;
 
 const REFRESH_OPEN  = 10;   // seconds, market open
-const REFRESH_CLOSE = 10;   // seconds, market closed (always 10s)
+const REFRESH_CLOSE = 10;   // seconds, market closed
+const HIST_MAX      = 720;  // ~2 hours at 10s
+const ALERT_COOLDOWN = 5*60*1000;  // 5 min between same-key fires
 
 /* ============================================================
    HELPERS
@@ -1687,6 +2047,118 @@ function loadWatch(){
   }catch(_){}
   watchlist=[...DEFAULT_WATCH];
 }
+function saveHoldings(){
+  try{ localStorage.setItem('twmkt_hold', JSON.stringify(holdings)); }catch(_){}
+}
+function loadHoldings(){
+  try{ const s=localStorage.getItem('twmkt_hold'); if(s) holdings = JSON.parse(s)||{}; }catch(_){}
+}
+function saveUserCats(){
+  try{ localStorage.setItem('twmkt_cats', JSON.stringify(userCats)); }catch(_){}
+}
+function loadUserCats(){
+  try{ const s=localStorage.getItem('twmkt_cats'); if(s) userCats = JSON.parse(s)||{}; }catch(_){}
+}
+function saveAlerts(){
+  try{ localStorage.setItem('twmkt_alerts', JSON.stringify(alerts)); }catch(_){}
+}
+function loadAlerts(){
+  try{ const s=localStorage.getItem('twmkt_alerts'); if(s) alerts = JSON.parse(s)||{}; }catch(_){}
+}
+function saveSort(){
+  try{ localStorage.setItem('twmkt_sort', sortMode); }catch(_){}
+}
+function loadSort(){
+  try{ const s=localStorage.getItem('twmkt_sort'); if(s) sortMode = s; }catch(_){}
+}
+
+/* ============================================================
+   CATEGORY OVERRIDES & HISTORY
+   ============================================================ */
+function getCategoryFor(code){
+  return userCats[code] || STOCK_DB[code]?.c || '自選';
+}
+function recordHistory(code, price){
+  if(price===null||isNaN(price)) return;
+  if(!history[code]) history[code] = [];
+  const arr = history[code];
+  const now = Date.now();
+  // avoid recording duplicate point at same epoch (within 2s)
+  if(arr.length && now - arr[arr.length-1].t < 2000 && arr[arr.length-1].p === price) return;
+  arr.push({t: now, p: price});
+  if(arr.length > HIST_MAX) arr.shift();
+}
+
+/* ============================================================
+   NOTIFICATIONS
+   ============================================================ */
+async function ensureNotifyPerm(){
+  if(!('Notification' in window)) return false;
+  if(Notification.permission === 'granted') return true;
+  if(Notification.permission === 'denied') return false;
+  try{
+    const r = await Notification.requestPermission();
+    return r === 'granted';
+  }catch(_){ return false; }
+}
+function fireNotify(title, body, key){
+  // Throttle: don't fire same key within cooldown
+  const now = Date.now();
+  if(key && alertFired[key] && now - alertFired[key] < ALERT_COOLDOWN) return;
+  if(key) alertFired[key] = now;
+  // Browser notification if granted
+  if('Notification' in window && Notification.permission === 'granted'){
+    try{ new Notification(title, {body, tag: key, icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="%23ff2d5e"/><text x="32" y="44" font-size="36" font-family="sans-serif" text-anchor="middle" fill="white" font-weight="bold">⚠</text></svg>'}); }catch(_){}
+  }
+  // Also show toast
+  toast(`🔔 ${title} — ${body}`, 'ok');
+  // Sound: short beep via WebAudio
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 880; g.gain.value = 0.04;
+    o.start(); o.frequency.exponentialRampToValueAtTime(440, ctx.currentTime+0.15);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.25);
+    o.stop(ctx.currentTime+0.3);
+  }catch(_){}
+}
+
+/* Run alert checks after each refresh */
+function checkAlerts(){
+  watchlist.forEach(code=>{
+    const d = cache[code];
+    if(!d) return;
+    const p = getCurPrice(d);
+    if(p===null) return;
+    const y = fp(d.y);
+    const a = alerts[code] || {};
+    const name = (STOCK_DB[code]?.n) || code;
+    // Target up
+    if(a.up && p >= a.up){
+      fireNotify(`${name} 達到目標價`, `現價 ${p.toFixed(2)} ≥ 目標 ${a.up}`, code+':up:'+a.up);
+    }
+    // Target down
+    if(a.dn && p <= a.dn){
+      fireNotify(`${name} 跌破目標價`, `現價 ${p.toFixed(2)} ≤ 目標 ${a.dn}`, code+':dn:'+a.dn);
+    }
+    // % change
+    if(a.pct && y){
+      const pctv = (p-y)/y*100;
+      if(Math.abs(pctv) >= Math.abs(a.pct)){
+        fireNotify(`${name} 漲跌 ${pctv>=0?'+':''}${pctv.toFixed(2)}%`, `超過 ${Math.abs(a.pct)}% 警示`, code+':pct:'+a.pct);
+      }
+    }
+    // Limit-up / limit-down approaching (within 1%)
+    const lu = fp(d.u), ld = fp(d.w);
+    if(lu && (lu - p)/lu < 0.01 && (lu - p)/lu >= 0){
+      fireNotify(`${name} 接近漲停`, `現價 ${p.toFixed(2)} / 漲停 ${lu.toFixed(2)}`, code+':lu');
+    }
+    if(ld && (p - ld)/ld < 0.01 && (p - ld)/ld >= 0){
+      fireNotify(`${name} 接近跌停`, `現價 ${p.toFixed(2)} / 跌停 ${ld.toFixed(2)}`, code+':ld');
+    }
+  });
+}
 
 /* ============================================================
    FETCH — TWSE MIS
@@ -1755,7 +2227,11 @@ async function doRefresh(){
       const flash = prev && (prevP !== newP || prev.tv !== item.tv);
       cache[code]=item;
       if(flash)cache[code]._flash=true;
+      // Record intraday history for sparkline / chart
+      if(newP !== null) recordHistory(code, newP);
     });
+    // Trigger alert checks
+    checkAlerts();
     if(mode==='watch'){
       renderGrid();
       renderStats();
@@ -1942,17 +2418,14 @@ function setMode(m){
    ============================================================ */
 function getCategoriesForWatch(){
   const set=new Set();
-  watchlist.forEach(c=>{
-    const info=STOCK_DB[c];
-    if(info)set.add(info.c);
-  });
+  watchlist.forEach(c=> set.add(getCategoryFor(c)));
   const ordered=CAT_ORDER.filter(c=>set.has(c));
   const extras=[...set].filter(c=>!CAT_ORDER.includes(c));
   return ['全部',...ordered,...extras];
 }
 function getCategoriesForBrowse(){
   const set=new Set();
-  for(const code in STOCK_DB){set.add(STOCK_DB[code].c);}
+  for(const code in STOCK_DB){set.add(getCategoryFor(code));}
   const ordered=CAT_ORDER.filter(c=>set.has(c));
   const extras=[...set].filter(c=>!CAT_ORDER.includes(c));
   return ['全部',...ordered,...extras];
@@ -1960,10 +2433,10 @@ function getCategoriesForBrowse(){
 function countInCat(cat){
   if(mode==='watch'){
     if(cat==='全部')return watchlist.length;
-    return watchlist.filter(c=>STOCK_DB[c]?.c===cat).length;
+    return watchlist.filter(c=>getCategoryFor(c)===cat).length;
   }else{
     if(cat==='全部')return Object.keys(STOCK_DB).length;
-    return Object.keys(STOCK_DB).filter(c=>STOCK_DB[c].c===cat).length;
+    return Object.keys(STOCK_DB).filter(c=>getCategoryFor(c)===cat).length;
   }
 }
 
@@ -2007,12 +2480,38 @@ function renderStats(){
   const fl=total-up-dn;
   const avg=cnt?(sumPct/cnt).toFixed(2):'--';
   const avgCls=cnt&&sumPct>=0?'up':(cnt?'dn':'amber');
+
+  // Portfolio P/L summary
+  let portfolioStr = '';
+  let totalCost = 0, totalMkt = 0, holdCnt = 0;
+  Object.keys(holdings).forEach(c=>{
+    const h = holdings[c];
+    const d = cache[c];
+    if(!h || !h.shares || !d) return;
+    const p = getCurPrice(d);
+    if(p===null) return;
+    totalCost += (h.cost||0) * h.shares;
+    totalMkt  += p * h.shares;
+    holdCnt++;
+  });
+  if(holdCnt > 0){
+    const pl = totalMkt - totalCost;
+    const plPct = totalCost ? (pl/totalCost*100) : 0;
+    const plCls = pl>0?'up':pl<0?'dn':'amber';
+    portfolioStr = `
+      <div class="stat-chip"><span class="sc-label">持股</span><span class="sc-val">${holdCnt} 檔</span></div>
+      <div class="stat-chip"><span class="sc-label">總市值</span><span class="sc-val">${totalMkt.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div>
+      <div class="stat-chip"><span class="sc-label">總損益</span><span class="sc-val ${plCls}">${pl>=0?'+':''}${pl.toLocaleString(undefined,{maximumFractionDigits:0})} (${plPct>=0?'+':''}${plPct.toFixed(2)}%)</span></div>
+    `;
+  }
+
   document.getElementById('statsRow').innerHTML=`
     <div class="stat-chip"><span class="sc-label">追蹤</span><span class="sc-val">${total} 檔</span></div>
     <div class="stat-chip"><span class="sc-label">上漲</span><span class="sc-val up">▲ ${up}</span></div>
     <div class="stat-chip"><span class="sc-label">下跌</span><span class="sc-val dn">▼ ${dn}</span></div>
     <div class="stat-chip"><span class="sc-label">持平</span><span class="sc-val amber">– ${fl}</span></div>
     <div class="stat-chip"><span class="sc-label">平均漲幅</span><span class="sc-val ${avgCls}">${cnt?(sumPct>=0?'+':'')+avg+'%':'--'}</span></div>
+    ${portfolioStr}
   `;
 }
 
@@ -2050,15 +2549,39 @@ function renderGrid(){
     return;
   }
 
-  const filtered = activeCat==='全部'
-    ? watchlist
-    : watchlist.filter(c=>STOCK_DB[c]?.c===activeCat);
+  let filtered = activeCat==='全部'
+    ? [...watchlist]
+    : watchlist.filter(c=>getCategoryFor(c)===activeCat);
+
+  // Apply sort mode
+  if(sortMode !== 'manual'){
+    filtered.sort((a,b)=>{
+      const da = cache[a], db = cache[b];
+      const pa = da ? getCurPrice(da) : null;
+      const pb = db ? getCurPrice(db) : null;
+      const ya = da ? fp(da.y) : null;
+      const yb = db ? fp(db.y) : null;
+      const pctA = (pa!==null&&ya) ? (pa-ya)/ya*100 : -Infinity;
+      const pctB = (pb!==null&&yb) ? (pb-yb)/yb*100 : -Infinity;
+      const vA = da ? parseInt(da.v||0) : 0;
+      const vB = db ? parseInt(db.v||0) : 0;
+      if(sortMode === 'gainers') return pctB - pctA;
+      if(sortMode === 'losers')  return pctA - pctB;
+      if(sortMode === 'absmove') return Math.abs(pctB) - Math.abs(pctA);
+      if(sortMode === 'vol')     return vB - vA;
+      return 0;
+    });
+  }
 
   const cnt=filtered.length;
   document.getElementById('sectionTitle').querySelector('span').textContent=
     `${activeCat==='全部'?'自選清單':activeCat} · ${cnt} 檔`;
+  const sortLbls = {manual:'',gainers:'· 漲幅排序',losers:'· 跌幅排序',absmove:'· 波動排序',vol:'· 量排序'};
   document.getElementById('sectionHint').textContent=
-    cnt ? '即時報價 · 含五檔買賣' : '';
+    cnt ? '含五檔買賣與盤中走勢 '+(sortLbls[sortMode]||'') : '';
+
+  // Show sort row only in watch mode
+  document.getElementById('sortRow').style.display = mode==='watch' ? '' : 'none';
 
   if(!cnt){
     document.getElementById('grid').className='stock-grid';
@@ -2071,14 +2594,16 @@ function renderGrid(){
   document.getElementById('grid').className='stock-grid';
   document.getElementById('grid').innerHTML=filtered.map(c=>cardHTML(c)).join('');
 
-  // Apply flash animation
+  // Apply flash animation + render sparklines + wire drag (manual mode)
   filtered.forEach(c=>{
     if(cache[c]?._flash){
       const el=document.getElementById('c-'+c);
       if(el){el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),700);}
       delete cache[c]._flash;
     }
+    renderSparkline(c);
   });
+  if(sortMode === 'manual') enableDrag();
 }
 
 /* ============================================================
@@ -2086,7 +2611,7 @@ function renderGrid(){
    ============================================================ */
 function renderBrowseGrid(){
   let list=Object.keys(STOCK_DB);
-  if(activeCat!=='全部') list=list.filter(c=>STOCK_DB[c].c===activeCat);
+  if(activeCat!=='全部') list=list.filter(c=>getCategoryFor(c)===activeCat);
 
   document.getElementById('sectionTitle').querySelector('span').textContent=
     `${activeCat==='全部'?'全部股票':activeCat} · ${list.length} 檔`;
@@ -2117,14 +2642,22 @@ function renderBrowseGrid(){
    ============================================================ */
 function cardHTML(code){
   const info=STOCK_DB[code]||{n:code,c:'自選',e:'tse'};
+  const cat = getCategoryFor(code);
   const d=cache[code];
+  const hasAlert = alerts[code] && (alerts[code].up||alerts[code].dn||alerts[code].pct);
+  const hasHold  = holdings[code] && holdings[code].shares;
+  const actionButtons = `
+      <div class="card-actions">
+        <button class="ca-btn ${hasHold?'holding-on':''}" title="持股 / 警示 / 分類設定" onclick="openSettings('${code}',event)">⚙</button>
+        <button class="ca-btn rm" title="移除" onclick="removeStock('${code}',event)">✕</button>
+      </div>`;
 
   if(!d){
-    return `<div class="card" id="c-${code}">
-      <button class="rm-btn" onclick="removeStock('${code}',event)">✕</button>
+    return `<div class="card" id="c-${code}" data-code="${code}">
+      ${actionButtons}
       <div class="card-head">
         <div><div class="c-code">${code} <span class="c-ex">${info.e.toUpperCase()}</span></div><div class="c-name">${esc(info.n)}</div></div>
-        <div class="c-tag">${info.c}</div>
+        <div class="c-tag">${cat}${hasAlert?' 🔔':''}</div>
       </div>
       <div class="skel" style="height:36px;margin-bottom:8px"></div>
       <div class="skel" style="height:14px;width:60%;margin-bottom:14px"></div>
@@ -2220,15 +2753,39 @@ function cardHTML(code){
   const updateT = d.t ? d.t.slice(0,8) : '--';
   const name    = d.n || info.n;
 
-  return `<div class="card card-${cls}" id="c-${code}">
-    <button class="rm-btn" onclick="removeStock('${code}',event)">✕</button>
+  // Holdings strip (P/L)
+  let holdHTML='';
+  if(hasHold && p!==null){
+    const h = holdings[code];
+    const cost = h.cost || 0;
+    const sh   = h.shares || 0;
+    const mktV = p * sh;
+    const costV = cost * sh;
+    const pl    = mktV - costV;
+    const plPct = costV ? (pl/costV*100) : 0;
+    const plCls = pl>0?'up':pl<0?'dn':'flat';
+    const stripCls = pl>0?'profit':pl<0?'loss':'';
+    holdHTML = `<div class="holding-strip ${stripCls}">
+      <div class="hs-left">
+        <span>持 ${sh.toLocaleString()} 股 @ ${cost.toFixed(2)}</span>
+        <span class="hs-cost">成本 ${costV.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+      </div>
+      <div class="hs-right">
+        <span class="hs-pl ${plCls}">${pl>=0?'+':''}${pl.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+        <span class="hs-pct">${plPct>=0?'+':''}${plPct.toFixed(2)}%</span>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="card card-${cls}" id="c-${code}" data-code="${code}"${sortMode==='manual'?' draggable="true"':''}>
+    ${actionButtons}
 
     <div class="card-head">
       <div>
         <div class="c-code">${code}<span class="c-ex">${(d.ex||info.e).toUpperCase()}</span></div>
         <div class="c-name">${esc(name)}</div>
       </div>
-      <div class="c-tag">${info.c}</div>
+      <div class="c-tag">${cat}${hasAlert?' 🔔':''}</div>
     </div>
 
     <div class="price-row">
@@ -2237,6 +2794,12 @@ function cardHTML(code){
         <div><span class="arrow">${arrowOf(chg)}</span>${chgStr}</div>
         <div class="pct">${pctStr}</div>
       </div>
+    </div>
+
+    ${holdHTML}
+
+    <div class="spark-wrap" id="spark-${code}" onclick="openChart('${code}')">
+      <div class="spark-empty">累積走勢中…</div>
     </div>
 
     <div class="ohlc">
@@ -2282,6 +2845,334 @@ function esc(s){
 }
 
 /* ============================================================
+   SORT
+   ============================================================ */
+function setSort(m){
+  sortMode = m;
+  saveSort();
+  document.querySelectorAll('.sort-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.sort === m);
+  });
+  renderGrid();
+}
+
+/* ============================================================
+   SPARKLINE
+   ============================================================ */
+function renderSparkline(code){
+  const el = document.getElementById('spark-'+code);
+  if(!el) return;
+  const hist = history[code];
+  if(!hist || hist.length < 2){
+    el.innerHTML = '<div class="spark-empty">累積走勢中…</div>';
+    return;
+  }
+  const d = cache[code];
+  const y = d ? fp(d.y) : null;
+  const prices = hist.map(h=>h.p);
+  const min = Math.min(...prices, y!==null?y:Infinity);
+  const max = Math.max(...prices, y!==null?y:-Infinity);
+  const range = max - min || 1;
+  const W = 280, H = 36;
+  const n = hist.length;
+  const xs = i => (n===1 ? W/2 : (i/(n-1))*W);
+  const ys = v => H - ((v - min)/range) * (H-4) - 2;
+  let pathD = '';
+  hist.forEach((h,i)=>{
+    pathD += (i===0?'M':'L') + xs(i).toFixed(1) + ' ' + ys(h.p).toFixed(1);
+  });
+  // Fill polygon
+  let fillD = pathD + ` L${W} ${H} L0 ${H} Z`;
+  // Trend cls (against open or y)
+  const first = hist[0].p, last = hist[hist.length-1].p;
+  const trend = last>first ? 'up' : last<first ? 'dn' : 'flat';
+  // Y-line for prev close
+  const yLine = (y!==null && y>=min && y<=max)
+    ? `<line class="spark-y" x1="0" y1="${ys(y).toFixed(1)}" x2="${W}" y2="${ys(y).toFixed(1)}" />`
+    : '';
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${yLine}
+      <path class="spark-fill ${trend}" d="${fillD}" />
+      <path class="spark-line ${trend}" d="${pathD}" />
+    </svg>
+    <span class="spark-hint">${hist.length} pts · 點擊放大</span>`;
+}
+
+/* ============================================================
+   DRAG-TO-REORDER (manual sort mode)
+   ============================================================ */
+function enableDrag(){
+  const cards = document.querySelectorAll('#grid .card[draggable="true"]');
+  cards.forEach(card=>{
+    card.addEventListener('dragstart', onDragStart);
+    card.addEventListener('dragend',   onDragEnd);
+    card.addEventListener('dragover',  onDragOver);
+    card.addEventListener('dragleave', onDragLeave);
+    card.addEventListener('drop',      onDrop);
+  });
+}
+function onDragStart(e){
+  dragSrcCode = e.currentTarget.dataset.code;
+  e.currentTarget.classList.add('dragging');
+  try{ e.dataTransfer.effectAllowed = 'move'; }catch(_){}
+}
+function onDragEnd(e){
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.card.drag-over').forEach(c=>c.classList.remove('drag-over'));
+}
+function onDragOver(e){
+  if(!dragSrcCode) return;
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+function onDragLeave(e){
+  e.currentTarget.classList.remove('drag-over');
+}
+function onDrop(e){
+  e.preventDefault();
+  const dstCode = e.currentTarget.dataset.code;
+  e.currentTarget.classList.remove('drag-over');
+  if(!dragSrcCode || dragSrcCode === dstCode) return;
+  const srcIdx = watchlist.indexOf(dragSrcCode);
+  const dstIdx = watchlist.indexOf(dstCode);
+  if(srcIdx<0 || dstIdx<0) return;
+  watchlist.splice(srcIdx, 1);
+  watchlist.splice(dstIdx, 0, dragSrcCode);
+  saveWatch();
+  renderGrid();
+  renderTicker();
+  renderStats();
+  dragSrcCode = null;
+}
+
+/* ============================================================
+   CHART MODAL (intraday large chart)
+   ============================================================ */
+let chartCode = null;
+function openChart(code){
+  chartCode = code;
+  const info = STOCK_DB[code] || {n:code};
+  document.getElementById('chCode').textContent = code;
+  document.getElementById('chName').textContent = info.n;
+  document.getElementById('chartMask').classList.add('show');
+  drawChart(code);
+}
+function closeChart(){
+  document.getElementById('chartMask').classList.remove('show');
+  chartCode = null;
+}
+function drawChart(code){
+  const wrap = document.getElementById('chartSvgWrap');
+  const stats = document.getElementById('chartStats');
+  const hist = history[code] || [];
+  const d = cache[code];
+  if(hist.length < 2){
+    wrap.innerHTML = '<div style="text-align:center;padding:80px 20px;color:var(--text-dim);font-family:var(--mono);font-size:12px">累積走勢中… 至少需要 2 筆資料點<br><span style="font-size:10px;color:var(--text-mute)">本頁每 10 秒抓一次，請稍候</span></div>';
+    stats.innerHTML = '';
+    return;
+  }
+  const W = 820, H = 280, padL = 50, padR = 12, padT = 14, padB = 24;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const y = d ? fp(d.y) : null;
+  const prices = hist.map(h=>h.p);
+  const tmin = hist[0].t, tmax = hist[hist.length-1].t;
+  const pmin = Math.min(...prices, y!==null?y:Infinity);
+  const pmax = Math.max(...prices, y!==null?y:-Infinity);
+  const prange = (pmax - pmin) || 1;
+  const tspan = (tmax - tmin) || 1;
+  const xOf = t => padL + ((t - tmin)/tspan)*innerW;
+  const yOf = p => padT + (1 - (p - pmin)/prange) * innerH;
+  let pathD = '', fillD = '';
+  hist.forEach((h,i)=>{
+    const x = xOf(h.t).toFixed(1), yy = yOf(h.p).toFixed(1);
+    pathD += (i===0?'M':'L') + x + ' ' + yy;
+  });
+  fillD = pathD + ` L${xOf(tmax).toFixed(1)} ${padT+innerH} L${xOf(tmin).toFixed(1)} ${padT+innerH} Z`;
+  const first = hist[0].p, last = hist[hist.length-1].p;
+  const trend = last>first?'up':last<first?'dn':'flat';
+  // Y-axis gridlines (5 ticks)
+  let grid = '';
+  for(let i=0;i<=4;i++){
+    const v = pmin + (prange*i/4);
+    const yy = yOf(v);
+    grid += `<line class="chart-grid" x1="${padL}" y1="${yy.toFixed(1)}" x2="${padL+innerW}" y2="${yy.toFixed(1)}" />`;
+    grid += `<text class="chart-axis" x="${padL-6}" y="${(yy+3).toFixed(1)}" text-anchor="end">${v.toFixed(2)}</text>`;
+  }
+  // X-axis time ticks
+  let xticks = '';
+  const tickCount = 5;
+  for(let i=0;i<=tickCount;i++){
+    const t = tmin + (tspan*i/tickCount);
+    const x = xOf(t);
+    const dt = new Date(t);
+    const tw = new Date(dt.toLocaleString('en-US',{timeZone:'Asia/Taipei'}));
+    const lbl = tw.toLocaleTimeString('zh-TW',{hour12:false,hour:'2-digit',minute:'2-digit'});
+    xticks += `<text class="chart-axis" x="${x.toFixed(1)}" y="${(H-6).toFixed(1)}" text-anchor="middle">${lbl}</text>`;
+  }
+  const yLine = (y!==null && y>=pmin && y<=pmax)
+    ? `<line class="chart-yline" x1="${padL}" y1="${yOf(y).toFixed(1)}" x2="${padL+innerW}" y2="${yOf(y).toFixed(1)}" />
+       <text class="chart-axis" x="${(padL+innerW+2).toFixed(1)}" y="${(yOf(y)+3).toFixed(1)}">昨 ${y.toFixed(2)}</text>`
+    : '';
+  wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    ${grid}
+    ${yLine}
+    <path class="chart-fill ${trend}" d="${fillD}" />
+    <path class="chart-line ${trend}" d="${pathD}" />
+    ${xticks}
+  </svg>`;
+  // Stats
+  const p = last;
+  const o = d ? fp(d.o) : null;
+  const hi = d ? fp(d.h) : null;
+  const lo = d ? fp(d.l) : null;
+  const chg = (p!==null && y!==null) ? p - y : null;
+  const pctv = pct(chg, y);
+  const cls = clsOf(chg);
+  stats.innerHTML = `
+    <div class="cs-cell"><span class="cs-lbl">現價</span><span class="cs-val ${cls}">${p.toFixed(2)}</span></div>
+    <div class="cs-cell"><span class="cs-lbl">漲跌</span><span class="cs-val ${cls}">${chg!==null?(chg>=0?'+':'')+chg.toFixed(2):'--'}</span></div>
+    <div class="cs-cell"><span class="cs-lbl">幅度</span><span class="cs-val ${cls}">${pctv!==null?(pctv>=0?'+':'')+pctv.toFixed(2)+'%':'--'}</span></div>
+    <div class="cs-cell"><span class="cs-lbl">昨收</span><span class="cs-val">${y!==null?y.toFixed(2):'--'}</span></div>
+    <div class="cs-cell"><span class="cs-lbl">開盤</span><span class="cs-val">${o!==null?o.toFixed(2):'--'}</span></div>
+    <div class="cs-cell"><span class="cs-lbl">最高</span><span class="cs-val up">${hi!==null?hi.toFixed(2):'--'}</span></div>
+    <div class="cs-cell"><span class="cs-lbl">最低</span><span class="cs-val dn">${lo!==null?lo.toFixed(2):'--'}</span></div>
+    <div class="cs-cell"><span class="cs-lbl">取樣點</span><span class="cs-val">${hist.length}</span></div>
+  `;
+}
+
+/* ============================================================
+   SETTINGS MODAL (holdings + alerts + category)
+   ============================================================ */
+let settingsCode = null;
+function openSettings(code, ev){
+  if(ev) ev.stopPropagation();
+  settingsCode = code;
+  const info = STOCK_DB[code] || {n:code};
+  document.getElementById('setCode').textContent = code;
+  document.getElementById('setName').textContent = info.n;
+  const h = holdings[code] || {};
+  document.getElementById('setCost').value   = h.cost  || '';
+  document.getElementById('setShares').value = h.shares|| '';
+  const a = alerts[code] || {};
+  document.getElementById('setTgtUp').value = a.up || '';
+  document.getElementById('setTgtDn').value = a.dn || '';
+  document.getElementById('setPct').value   = a.pct|| '';
+  document.getElementById('setCat').value   = userCats[code] || '';
+  document.getElementById('settingsMask').classList.add('show');
+}
+function closeSettings(){
+  document.getElementById('settingsMask').classList.remove('show');
+  settingsCode = null;
+}
+async function saveStockSettings(){
+  if(!settingsCode) return;
+  const code = settingsCode;
+  const cost = parseFloat(document.getElementById('setCost').value);
+  const sh   = parseFloat(document.getElementById('setShares').value);
+  const tu   = parseFloat(document.getElementById('setTgtUp').value);
+  const td   = parseFloat(document.getElementById('setTgtDn').value);
+  const pct  = parseFloat(document.getElementById('setPct').value);
+  const cat  = document.getElementById('setCat').value.trim();
+  // Holdings
+  if(!isNaN(cost) && !isNaN(sh) && sh>0){
+    holdings[code] = {cost, shares: sh};
+  }else{
+    delete holdings[code];
+  }
+  saveHoldings();
+  // Alerts
+  const a = {};
+  if(!isNaN(tu) && tu>0) a.up = tu;
+  if(!isNaN(td) && td>0) a.dn = td;
+  if(!isNaN(pct)&& pct>0) a.pct= pct;
+  if(Object.keys(a).length){
+    alerts[code] = a;
+    await ensureNotifyPerm();
+  }else{
+    delete alerts[code];
+  }
+  saveAlerts();
+  // Category
+  if(cat){ userCats[code] = cat; } else { delete userCats[code]; }
+  saveUserCats();
+  closeSettings();
+  toast(`${STOCK_DB[code]?.n||code} 設定已儲存`, 'ok');
+  renderTabs();
+  renderGrid();
+  renderStats();
+}
+function clearStockSettings(){
+  if(!settingsCode) return;
+  if(!confirm('要清除此股票的持股、警示與分類設定？')) return;
+  const code = settingsCode;
+  delete holdings[code]; saveHoldings();
+  delete alerts[code];   saveAlerts();
+  delete userCats[code]; saveUserCats();
+  closeSettings();
+  toast(`已清除 ${STOCK_DB[code]?.n||code} 的設定`);
+  renderTabs();
+  renderGrid();
+  renderStats();
+}
+
+/* ============================================================
+   INTERNATIONAL INDICES TICKER
+   ============================================================ */
+const INTL_SYMBOLS = [
+  {sym:'^DJI',     name:'道瓊'},
+  {sym:'^GSPC',    name:'S&P500'},
+  {sym:'^IXIC',    name:'NASDAQ'},
+  {sym:'^SOX',     name:'費城半導體'},
+  {sym:'^N225',    name:'日經'},
+  {sym:'^HSI',     name:'恆生'},
+  {sym:'TWD=X',    name:'USD/TWD'},
+];
+async function fetchIntl(){
+  const symbols = INTL_SYMBOLS.map(x=>x.sym).join(',');
+  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbols)}`;
+  for(const proxy of PROXIES){
+    try{
+      const r = await fetch(proxy(url), {signal: AbortSignal.timeout(8000)});
+      if(!r.ok) continue;
+      const t = await r.text();
+      const j = JSON.parse(t);
+      const arr = j?.quoteResponse?.result;
+      if(!arr || !arr.length) continue;
+      arr.forEach(q=>{
+        intlData[q.symbol] = {
+          price: q.regularMarketPrice,
+          prev:  q.regularMarketPreviousClose,
+          chg:   q.regularMarketChange,
+          pct:   q.regularMarketChangePercent,
+        };
+      });
+      renderIntl();
+      return;
+    }catch(_){}
+  }
+}
+function renderIntl(){
+  const el = document.getElementById('intlRow');
+  if(!el) return;
+  const chips = INTL_SYMBOLS.map(s=>{
+    const d = intlData[s.sym];
+    if(!d || d.price == null){
+      return `<span class="intl-chip"><span class="intl-name">${s.name}</span><span class="intl-price">--</span></span>`;
+    }
+    const cls = d.pct>0?'up':d.pct<0?'dn':'';
+    const arrow = d.pct>0?'▲':d.pct<0?'▼':'–';
+    const priceStr = d.price>=100 ? d.price.toFixed(0) : d.price.toFixed(2);
+    return `<span class="intl-chip ${cls}">
+      <span class="intl-name">${s.name}</span>
+      <span class="intl-price">${priceStr}</span>
+      <span class="intl-pct">${arrow} ${d.pct!=null?(d.pct>=0?'+':'')+d.pct.toFixed(2)+'%':'--'}</span>
+    </span>`;
+  }).join('');
+  el.innerHTML = chips;
+}
+
+/* ============================================================
    CLOCK & COUNTDOWN
    ============================================================ */
 function tick(){
@@ -2311,8 +3202,17 @@ function init(){
   // 顯示免責聲明（若使用者尚未同意）
   showConsent(false);
   loadWatch();
+  loadHoldings();
+  loadUserCats();
+  loadAlerts();
+  loadSort();
+  // Reflect loaded sort in UI
+  document.querySelectorAll('.sort-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.sort === sortMode);
+  });
   setMode('watch');
   renderStats();
+  renderIntl();
 
   // Skeleton ticker
   document.getElementById('ticker').innerHTML=
@@ -2323,6 +3223,14 @@ function init(){
 
   setInterval(tick,1000);
   doRefresh();
+  fetchIntl();
+  // Refresh intl indices every 60s
+  setInterval(fetchIntl, 60000);
+
+  // PWA: register service worker
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
 }
 
 window.addEventListener('DOMContentLoaded',init);
