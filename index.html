@@ -1920,6 +1920,46 @@ const HIST_MAX      = 720;  // ~2 hours at 10s
 const ALERT_COOLDOWN = 5*60*1000;  // 5 min between same-key fires
 
 /* ============================================================
+   TWSE 休市日曆  ── 依台灣證券交易所公告，每年底更新
+   格式 'YYYY-MM-DD'（台北時間）。落在清單內的日子視為休市。
+   EXTRA_TRADING_DAYS：補行交易的週六（如有，平常留空）。
+   ⚠ 調整放假/補假日請每年對照官方行事曆確認後修改。
+   ============================================================ */
+const MARKET_HOLIDAYS = new Set([
+  // 2025（民國114年）
+  '2025-01-01', // 元旦
+  '2025-01-27', // 春節彈性放假
+  '2025-01-28', // 除夕
+  '2025-01-29', // 春節
+  '2025-01-30', // 春節
+  '2025-01-31', // 春節
+  '2025-02-28', // 和平紀念日
+  '2025-04-03', // 兒童節調整放假
+  '2025-04-04', // 兒童節暨民族掃墓節
+  '2025-05-01', // 勞動節
+  '2025-05-30', // 端午節調整放假
+  '2025-10-06', // 中秋節
+  '2025-10-10', // 國慶日
+  // 2026（民國115年）
+  '2026-01-01', // 元旦
+  '2026-02-16', // 春節
+  '2026-02-17', // 春節
+  '2026-02-18', // 春節
+  '2026-02-19', // 春節
+  '2026-02-20', // 春節
+  '2026-02-27', // 和平紀念日調整放假
+  '2026-04-03', // 兒童節暨民族掃墓節調整放假
+  '2026-04-06', // 兒童節暨民族掃墓節補假
+  '2026-05-01', // 勞動節
+  '2026-06-19', // 端午節
+  '2026-09-25', // 中秋節
+  '2026-10-09', // 國慶日調整放假
+]);
+const EXTRA_TRADING_DAYS = new Set([
+  // 補行交易的週六，例如 '2026-02-14'（如有再填）
+]);
+
+/* ============================================================
    HELPERS
    ============================================================ */
 function twNow(){ return new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Taipei'})); }
@@ -1927,9 +1967,17 @@ function twDateStr(){
   const t=twNow();
   return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
 }
+function isTradingDay(t){
+  t = t || twNow();
+  const ds = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+  if(MARKET_HOLIDAYS.has(ds)) return false;        // 公告休市日
+  if(EXTRA_TRADING_DAYS.has(ds)) return true;      // 補行交易（覆蓋週末規則）
+  const d = t.getDay();
+  return d>=1 && d<=5;                             // 週一~週五
+}
 function isMktOpen(){
-  const t=twNow(),d=t.getDay(),m=t.getHours()*60+t.getMinutes();
-  return d>=1&&d<=5 && m>=540&&m<810;
+  const t=twNow(),m=t.getHours()*60+t.getMinutes();
+  return isTradingDay(t) && m>=540&&m<810;
 }
 function fmtTime(t){
   t=t||twNow();
