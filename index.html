@@ -1910,6 +1910,9 @@ let countdown    = 10;
 let isRefreshing = false;
 let searchHL     = -1;
 let dragSrcCode  = null;
+let histDate     = null;     // TW date (YYYY-MM-DD) the current history belongs to
+let mktPhase     = null;     // 'open' | 'closed' — for detecting session transitions
+let closeBackfillDone = false; // guards the one-shot full intraday backfill after close
 
 const REFRESH_OPEN  = 10;   // seconds, market open
 const REFRESH_CLOSE = 10;   // seconds, market closed
@@ -1920,6 +1923,10 @@ const ALERT_COOLDOWN = 5*60*1000;  // 5 min between same-key fires
    HELPERS
    ============================================================ */
 function twNow(){ return new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Taipei'})); }
+function twDateStr(){
+  const t=twNow();
+  return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+}
 function isMktOpen(){
   const t=twNow(),d=t.getDay(),m=t.getHours()*60+t.getMinutes();
   return d>=1&&d<=5 && m>=540&&m<810;
@@ -2134,6 +2141,22 @@ function saveSort(){
 }
 function loadSort(){
   try{ const s=localStorage.getItem('twmkt_sort'); if(s) sortMode = s; }catch(_){}
+}
+function saveHistory(){
+  try{
+    localStorage.setItem('twmkt_hist', JSON.stringify({date: histDate, data: history}));
+  }catch(_){}
+}
+function loadHistory(){
+  try{
+    const s = localStorage.getItem('twmkt_hist');
+    if(!s) return;
+    const obj = JSON.parse(s);
+    if(obj && obj.data && typeof obj.data === 'object'){
+      history  = obj.data;
+      histDate = obj.date || null;
+    }
+  }catch(_){}
 }
 
 /* ============================================================
@@ -3197,13 +3220,16 @@ function onDrop(e){
    CHART MODAL (intraday large chart)
    ============================================================ */
 let chartCode = null;
-function openChart(code){
+async function openChart(code){
   chartCode = code;
   const info = STOCK_DB[code] || {n:code};
   document.getElementById('chCode').textContent = code;
   document.getElementById('chName').textContent = info.n;
   document.getElementById('chartMask').classList.add('show');
-  drawChart(code);
+  drawChart(code);   // immediate render from whatever we have
+  // Upgrade to the complete day's 1-minute series in the background.
+  const ok = await backfillIntraday(code);
+  if(ok && chartCode === code) drawChart(code);
 }
 function closeChart(){
   document.getElementById('chartMask').classList.remove('show');
@@ -3400,6 +3426,76 @@ async function fetchOneIntl(sym){
   }
   return null;
 }
+/* Full-day 1-minute intraday from Yahoo v8 — used to backfill / freeze charts.
+   TSE codes map to .TW, OTC codes to .TWO. Falls back to the opposite suffix. */
+async function fetchIntraday(code){
+  const prefer = STOCK_DB[code]?.e === 'otc' ? '.TWO' : '.TW';
+  const other  = prefer === '.TW' ? '.TWO' : '.TW';
+  for(const suffix of [prefer, other]){
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${code}${suffix}?interval=1m&range=1d`;
+    const candidates = [u=>u, ...PROXIES];
+    for(const wrap of candidates){
+      try{
+        const r = await fetch(wrap(url), {signal: AbortSignal.timeout(8000)});
+        if(!r.ok) continue;
+        const j = JSON.parse(await r.text());
+        const res = j?.chart?.result?.[0];
+        const ts  = res?.timestamp;
+        const cl  = res?.indicators?.quote?.[0]?.close;
+        if(!Array.isArray(ts) || !Array.isArray(cl)) continue;
+        const pts = [];
+        for(let i=0;i<ts.length;i++){
+          const p = cl[i];
+          if(p==null) continue;
+          pts.push({t: ts[i]*1000, p: +(+p).toFixed(2)});
+        }
+        if(pts.length){
+          // Remember a working suffix as the correct exchange
+          if(STOCK_DB[code]) STOCK_DB[code].e = (suffix === '.TWO') ? 'otc' : 'tse';
+          return pts;
+        }
+      }catch(_){}
+    }
+  }
+  return null;
+}
+
+/* Replace history for one code with the complete day's intraday series. */
+async function backfillIntraday(code){
+  const pts = await fetchIntraday(code);
+  if(pts && pts.length){
+    history[code] = pts.slice(-HIST_MAX);
+    if(!histDate) histDate = twDateStr();
+    saveHistory();
+    return true;
+  }
+  return false;
+}
+
+/* Backfill every watchlist stock (concurrency-limited) — runs once after close. */
+async function backfillAllIntraday(){
+  const codes = [...new Set(watchlist)];
+  if(!codes.length) return;
+  let any = false;
+  const CONC = 5;
+  for(let i=0;i<codes.length;i+=CONC){
+    const chunk = codes.slice(i, i+CONC);
+    const rs = await Promise.allSettled(chunk.map(c => fetchIntraday(c).then(pts => ({c, pts}))));
+    rs.forEach(r=>{
+      if(r.status==='fulfilled' && r.value.pts){
+        history[r.value.c] = r.value.pts.slice(-HIST_MAX);
+        any = true;
+      }
+    });
+  }
+  if(any){
+    histDate = twDateStr();
+    saveHistory();
+    if(mode==='watch') renderGrid();
+    if(chartCode) drawChart(chartCode);
+  }
+}
+
 async function fetchIntl(){
   const results = await Promise.allSettled(
     INTL_SYMBOLS.map(s => fetchOneIntl(s.sym).then(d => ({sym: s.sym, d})))
@@ -3446,12 +3542,33 @@ function tick(){
   txt.textContent=open?'市場交易中':'市場已收盤';
   txt.className=open?'open':'';
 
-  countdown--;
-  if(countdown<=0){
-    countdown = open ? REFRESH_OPEN : REFRESH_CLOSE;
-    doRefresh();
+  const today = twDateStr();
+  if(open){
+    if(mktPhase !== 'open'){
+      // Session opened (or first load during trading hours):
+      // if our stored history is from a previous day, start the new day fresh.
+      if(histDate !== today){ history = {}; histDate = today; saveHistory(); }
+      closeBackfillDone = false;
+      // Backfill once so the chart is complete from 09:00, not just from
+      // when the page was opened. Live 10s sampling continues on top.
+      backfillAllIntraday();
+    }
+    mktPhase = 'open';
+    countdown--;
+    if(countdown<=0){
+      countdown = REFRESH_OPEN;
+      doRefresh();
+    }
+    document.getElementById('countdown').textContent=countdown;
+  }else{
+    if(mktPhase !== 'closed'){
+      mktPhase = 'closed';
+      // Just closed (or first load while closed): pull the complete day's
+      // intraday once so charts show the full session, then stop polling.
+      if(!closeBackfillDone){ closeBackfillDone = true; backfillAllIntraday(); }
+    }
+    document.getElementById('countdown').textContent='–';
   }
-  document.getElementById('countdown').textContent=countdown;
 }
 
 /* ============================================================
@@ -3467,6 +3584,7 @@ function init(){
   loadUserCats();
   loadAlerts();
   loadSort();
+  loadHistory();
   // Reflect loaded sort in UI
   document.querySelectorAll('.sort-btn').forEach(b=>{
     b.classList.toggle('active', b.dataset.sort === sortMode);
@@ -3496,9 +3614,10 @@ function init(){
 
 window.addEventListener('DOMContentLoaded',init);
 
-/* Refresh when tab regains focus */
+/* Refresh when tab regains focus — only while the market is open
+   (after close the chart is frozen on the day's data). */
 document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden)doRefresh();
+  if(!document.hidden && isMktOpen())doRefresh();
 });
 </script>
 </body>
